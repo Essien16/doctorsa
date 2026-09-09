@@ -1,11 +1,11 @@
+import type { AssignedVisit } from "./assigned-visit.js";
 import type { Bid } from "./bid.js";
 import type { DoctorProfile } from "./doctor-profile.js";
 import type { OpenVisit } from "./open-visit.js";
+import type { PatientVisitDetails } from "./patient-visit-details.js";
+import type { PatientVisitSummary } from "./patient-visit-summary.js";
 import type { Specialty } from "./specialty.js";
 import type { Visit } from "./visit.js";
-import type { PatientVisitDetails } from "./patient-visit-details.js";
-import type { AssignedVisit } from "./assigned-visit.js";
-import type { PatientVisitSummary } from "./patient-visit-summary.js";
 
 export interface CreateVisitData {
   patientId: string;
@@ -13,6 +13,16 @@ export interface CreateVisitData {
   location: string;
   preferredAt: Date;
 }
+
+export type CreateVisitResult =
+  | {
+      success: true;
+      visit: Visit;
+    }
+  | {
+      success: false;
+      reason: "PATIENT_SCHEDULE_CONFLICT";
+    };
 
 export interface SubmitBidData {
   visitId: string;
@@ -38,7 +48,9 @@ export type SubmitBidResult =
     };
 
 export interface VisitRepository {
-  specialtyExists(specialtyId: string): Promise<boolean>;
+  specialtyExists(
+    specialtyId: string,
+  ): Promise<boolean>;
 
   listSpecialties(): Promise<Specialty[]>;
 
@@ -50,22 +62,24 @@ export interface VisitRepository {
     specialtyId: string,
   ): Promise<OpenVisit[]>;
 
-  create(data: CreateVisitData): Promise<Visit>;
+  create(
+    data: CreateVisitData,
+  ): Promise<CreateVisitResult>;
 
   submitBid(
     data: SubmitBidData,
   ): Promise<SubmitBidResult>;
 
   findPatientVisitDetails(
-  visitId: string,
-  patientId: string,
-): Promise<PatientVisitDetails | null>;
+    visitId: string,
+    patientId: string,
+  ): Promise<PatientVisitDetails | null>;
 
-listAssignedForDoctorProfile(
-  doctorProfileId: string,
-): Promise<AssignedVisit[]>;
+  listAssignedForDoctorProfile(
+    doctorProfileId: string,
+  ): Promise<AssignedVisit[]>;
 
-listForPatient(
-  patientId: string,
-): Promise<PatientVisitSummary[]>;
+  listForPatient(
+    patientId: string,
+  ): Promise<PatientVisitSummary[]>;
 }

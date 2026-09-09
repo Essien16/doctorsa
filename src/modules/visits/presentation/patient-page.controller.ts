@@ -10,6 +10,7 @@ import type { GetPatientVisitService } from "../application/get-patient-visit.se
 import type { ListPatientVisitsService } from "../application/list-patient-visits.service.js";
 import type { ListSpecialtiesService } from "../application/list-specialties.service.js";
 import { createVisitPageSchema } from "./visit.schemas.js";
+import { ConflictError } from "../../../shared/errors/conflict-error.js";
 
 const dateFormatter = new Intl.DateTimeFormat("en-NG", {
   dateStyle: "medium",
@@ -95,68 +96,92 @@ export class PatientPageController {
   };
 
   createVisit = async (
-    request: Request,
-    response: Response,
-    next: NextFunction,
-  ): Promise<void> => {
+  request: Request,
+  response: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const patientId = this.getPatientId(request);
+
+    const validation = createVisitPageSchema.safeParse(
+      request.body,
+    );
+
+    if (!validation.success) {
+      await this.renderCreateVisitPage(response, 400, {
+        errorMessage:
+          "Please correct the highlighted information.",
+        values: request.body,
+        fieldErrors:
+          validation.error.flatten().fieldErrors,
+      });
+
+      return;
+    }
+
+    /*
+      * datetime-local does not contain a timezone.
+      * This task currently interprets it as Lagos time.
+      * Nigeria uses UTC+01:00 throughout the year.
+     */
+    const preferredAt = new Date(
+      `${validation.data.preferredAt}:00+01:00`,
+    );
+
+    if (
+      Number.isNaN(preferredAt.getTime()) ||
+      preferredAt <= new Date()
+    ) {
+      await this.renderCreateVisitPage(response, 400, {
+        errorMessage:
+          "Preferred time must be in the future.",
+        values: validation.data,
+        fieldErrors: {
+          preferredAt: [
+            "Select a date and time in the future.",
+          ],
+        },
+      });
+
+      return;
+    }
+
     try {
-      const patientId = this.getPatientId(request);
-
-      const validation = createVisitPageSchema.safeParse(
-        request.body,
-      );
-
-      if (!validation.success) {
-        await this.renderCreateVisitPage(response, 400, {
-          errorMessage:
-            "Please correct the highlighted information.",
-          values: request.body,
-          fieldErrors:
-            validation.error.flatten().fieldErrors,
-        });
-
-        return;
-      }
-
-      /*
-       * datetime-local does not contain a timezone.
-       * This task currently interprets it as Lagos time.
-       * Nigeria uses UTC+01:00 throughout the year.
-       */
-      const preferredAt = new Date(
-        `${validation.data.preferredAt}:00+01:00`,
-      );
-
-      if (
-        Number.isNaN(preferredAt.getTime()) ||
-        preferredAt <= new Date()
-      ) {
-        await this.renderCreateVisitPage(response, 400, {
-          errorMessage:
-            "Preferred time must be in the future.",
-          values: validation.data,
-          fieldErrors: {
-            preferredAt: [
-              "Select a date and time in the future.",
-            ],
-          },
-        });
-
-        return;
-      }
-
       await this.createVisitService.execute({
         patientId,
-        specialtyId: validation.data.specialtyId,
+        specialtyId:
+          validation.data.specialtyId,
         location: validation.data.location,
         preferredAt,
       });
-
-      response.redirect(303, "/patient/visits");
     } catch (error) {
-      next(error);
+      if (error instanceof ConflictError) {
+        await this.renderCreateVisitPage(
+          response,
+          409,
+          {
+            errorMessage:
+              "This appointment overlaps another visit on your schedule.",
+            values: validation.data,
+            fieldErrors: {
+              preferredAt: [
+                "Choose a time at least one hour after your other visit.",
+              ],
+            },
+          },
+        );
+
+        return;
+      }
+
+      throw error;
     }
-  };
+
+    response.redirect(303, "/patient/visits");
+  } catch (error) {
+    next(error);
+  }
+};
 
   showVisitDetails = async (
     request: Request,

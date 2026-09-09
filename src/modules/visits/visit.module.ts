@@ -64,6 +64,7 @@ const patientPageController = new PatientPageController(
 const doctorPageController = new DoctorPageController(
   listOpenVisitsService,
   submitBidService,
+  listAssignedVisitsService,
 );
 
 export const visitRouter = createVisitRouter(visitController);

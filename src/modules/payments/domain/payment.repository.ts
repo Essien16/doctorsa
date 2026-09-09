@@ -1,6 +1,5 @@
-import type { Payment } from "./payment.js";
 import type { PaymentSucceededEvent } from "./payment-event.js";
-
+import type { Payment } from "./payment.js";
 
 export interface SelectBidAndCreatePaymentData {
   patientId: string;
@@ -13,7 +12,8 @@ export type CreatePaymentFailureReason =
   | "VISIT_NOT_FOUND"
   | "BID_NOT_FOUND"
   | "VISIT_NOT_SELECTABLE"
-  | "PAYMENT_ALREADY_EXISTS";
+  | "PAYMENT_ALREADY_EXISTS"
+  | "DOCTOR_SCHEDULE_CONFLICT";
 
 export type CreatePaymentResult =
   | {
@@ -24,21 +24,6 @@ export type CreatePaymentResult =
       success: false;
       reason: CreatePaymentFailureReason;
     };
-
-export interface PaymentRepository {
-  selectBidAndCreatePayment(
-    data: SelectBidAndCreatePaymentData,
-  ): Promise<CreatePaymentResult>;
-
-  processSuccessfulPayment(
-  event: PaymentSucceededEvent,
-): Promise<ProcessPaymentResult>;
-
-findForPatient(
-  paymentId: string,
-  patientId: string,
-): Promise<Payment | null>;
-}
 
 export type ProcessPaymentFailureReason =
   | "PAYMENT_NOT_FOUND"
@@ -55,3 +40,18 @@ export type ProcessPaymentResult =
       success: false;
       reason: ProcessPaymentFailureReason;
     };
+
+export interface PaymentRepository {
+  selectBidAndCreatePayment(
+    data: SelectBidAndCreatePaymentData,
+  ): Promise<CreatePaymentResult>;
+
+  processSuccessfulPayment(
+    event: PaymentSucceededEvent,
+  ): Promise<ProcessPaymentResult>;
+
+  findForPatient(
+    paymentId: string,
+    patientId: string,
+  ): Promise<Payment | null>;
+}

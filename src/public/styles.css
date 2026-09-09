@@ -623,3 +623,36 @@ textarea:focus {
     flex-direction: column;
   }
 }
+
+.assigned-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.assigned-card {
+  padding: 26px;
+  border: 1px solid #dce7e0;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.assigned-card h2 {
+  margin: 0;
+}
+
+.appointment-note {
+  margin-top: 24px;
+  padding: 16px;
+  border-radius: 10px;
+  background: #f2f7f4;
+}
+
+.appointment-note strong {
+  color: #137547;
+  font-size: 0.85rem;
+}
+
+.appointment-note p {
+  margin: 7px 0 0;
+  line-height: 1.5;
+}

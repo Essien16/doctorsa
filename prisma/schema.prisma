@@ -51,10 +51,12 @@ model DoctorProfile {
   userId      String @unique @map("user_id") @db.Uuid
   specialtyId String @map("specialty_id") @db.Uuid
 
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  specialty      Specialty @relation(fields: [specialtyId], references: [id])
-  bids           Bid[]
-  assignedVisits Visit[]   @relation("AssignedDoctor")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialty Specialty @relation(fields: [specialtyId], references: [id])
+  bids      Bid[]
+
+  assignedVisits Visit[] @relation("AssignedDoctor")
+  reservedVisits Visit[] @relation("ReservedDoctor")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -77,29 +79,39 @@ model Specialty {
 }
 
 model Visit {
-  id                      String      @id @default(uuid()) @db.Uuid
-  patientId               String      @map("patient_id") @db.Uuid
-  specialtyId             String      @map("specialty_id") @db.Uuid
-  selectedBidId           String?     @unique @map("selected_bid_id") @db.Uuid
-  assignedDoctorProfileId String?     @map("assigned_doctor_profile_id") @db.Uuid
-  location                String      @db.VarChar(255)
-  preferredAt             DateTime    @map("preferred_at")
-  status                  VisitStatus @default(OPEN)
+  id          String @id @default(uuid()) @db.Uuid
+  patientId   String @map("patient_id") @db.Uuid
+  specialtyId String @map("specialty_id") @db.Uuid
 
-  patient        User                 @relation("PatientVisits", fields: [patientId], references: [id])
-  specialty      Specialty            @relation(fields: [specialtyId], references: [id])
-  selectedBid    Bid?                 @relation("SelectedBid", fields: [selectedBidId], references: [id], onDelete: SetNull)
-  assignedDoctor DoctorProfile?       @relation("AssignedDoctor", fields: [assignedDoctorProfileId], references: [id])
-  bids           Bid[]                @relation("VisitBids")
-  payment        Payment?
-  statusHistory  VisitStatusHistory[]
+  selectedBidId           String? @unique @map("selected_bid_id") @db.Uuid
+  assignedDoctorProfileId String? @map("assigned_doctor_profile_id") @db.Uuid
+  reservedDoctorProfileId String? @map("reserved_doctor_profile_id") @db.Uuid
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  location                   String      @db.VarChar(255)
+  preferredAt                DateTime    @map("preferred_at") @db.Timestamptz(3)
+  scheduledEndAt             DateTime    @map("scheduled_end_at") @db.Timestamptz(3)
+  doctorReservationExpiresAt DateTime?   @map("doctor_reservation_expires_at") @db.Timestamptz(3)
+  status                     VisitStatus @default(OPEN)
+
+  patient   User      @relation("PatientVisits", fields: [patientId], references: [id])
+  specialty Specialty @relation(fields: [specialtyId], references: [id])
+
+  selectedBid    Bid?           @relation("SelectedBid", fields: [selectedBidId], references: [id], onDelete: SetNull)
+  assignedDoctor DoctorProfile? @relation("AssignedDoctor", fields: [assignedDoctorProfileId], references: [id], onDelete: SetNull)
+  reservedDoctor DoctorProfile? @relation("ReservedDoctor", fields: [reservedDoctorProfileId], references: [id], onDelete: SetNull)
+
+  bids          Bid[]                @relation("VisitBids")
+  payment       Payment?
+  statusHistory VisitStatusHistory[]
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([patientId])
   @@index([specialtyId, status])
   @@index([assignedDoctorProfileId])
+  @@index([reservedDoctorProfileId])
+  @@index([doctorReservationExpiresAt])
   @@map("visits")
 }
 
@@ -110,9 +122,10 @@ model Bid {
   amountInKobo    Int    @map("amount_in_kobo")
   note            String @db.VarChar(280)
 
-  visit            Visit         @relation("VisitBids", fields: [visitId], references: [id], onDelete: Cascade)
-  doctorProfile    DoctorProfile @relation(fields: [doctorProfileId], references: [id])
-  selectedForVisit Visit?        @relation("SelectedBid")
+  visit         Visit         @relation("VisitBids", fields: [visitId], references: [id], onDelete: Cascade)
+  doctorProfile DoctorProfile @relation(fields: [doctorProfileId], references: [id])
+
+  selectedForVisit Visit?   @relation("SelectedBid")
   payment          Payment?
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -143,11 +156,12 @@ model Payment {
 }
 
 model WebhookEvent {
-  id              String   @id @default(uuid()) @db.Uuid
-  providerEventId String   @unique @map("provider_event_id") @db.VarChar(100)
-  eventType       String   @map("event_type") @db.VarChar(100)
+  id              String @id @default(uuid()) @db.Uuid
+  providerEventId String @unique @map("provider_event_id") @db.VarChar(100)
+  eventType       String @map("event_type") @db.VarChar(100)
   payload         Json
-  processedAt     DateTime @default(now()) @map("processed_at")
+
+  processedAt DateTime @default(now()) @map("processed_at") @db.Timestamptz(3)
 
   @@map("webhook_events")
 }

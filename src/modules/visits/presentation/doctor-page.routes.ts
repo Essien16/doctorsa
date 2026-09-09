@@ -23,5 +23,12 @@ export function createDoctorPageRouter(
     controller.submitBid,
   );
 
+  router.get(
+    "/doctor/assigned-visits",
+    requireAuthentication,
+    requireRole("DOCTOR"),
+    controller.showAssignedVisits,
+  );
+
   return router;
 }

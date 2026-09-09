@@ -1,3 +1,4 @@
+import { ConflictError } from "../../../shared/errors/conflict-error.js";
 import { NotFoundError } from "../../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../../shared/errors/validation-error.js";
 import type { VisitRepository } from "../domain/visit.repository.js";
@@ -14,11 +15,14 @@ type Clock = () => Date;
 
 export class CreateVisitService {
   constructor(
-    private readonly visitRepository: VisitRepository,
+    private readonly visitRepository:
+      VisitRepository,
     private readonly clock: Clock = () => new Date(),
   ) {}
 
-  async execute(input: CreateVisitInput): Promise<Visit> {
+  async execute(
+    input: CreateVisitInput,
+  ): Promise<Visit> {
     const location = input.location.trim();
 
     if (location.length < 2) {
@@ -28,7 +32,9 @@ export class CreateVisitService {
     }
 
     if (Number.isNaN(input.preferredAt.getTime())) {
-      throw new ValidationError("Preferred time is invalid");
+      throw new ValidationError(
+        "Preferred time is invalid",
+      );
     }
 
     if (input.preferredAt <= this.clock()) {
@@ -46,11 +52,20 @@ export class CreateVisitService {
       throw new NotFoundError("Specialty");
     }
 
-    return this.visitRepository.create({
-      patientId: input.patientId,
-      specialtyId: input.specialtyId,
-      location,
-      preferredAt: input.preferredAt,
-    });
+    const result =
+      await this.visitRepository.create({
+        patientId: input.patientId,
+        specialtyId: input.specialtyId,
+        location,
+        preferredAt: input.preferredAt,
+      });
+
+    if (!result.success) {
+      throw new ConflictError(
+        "You already have a visit scheduled during this time",
+      );
+    }
+
+    return result.visit;
   }
 }

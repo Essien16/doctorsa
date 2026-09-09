@@ -5,6 +5,7 @@ import type { OpenVisit } from "../domain/open-visit.js";
 import type { Specialty } from "../domain/specialty.js";
 import type {
   CreateVisitData,
+  CreateVisitResult,
   SubmitBidData,
   SubmitBidResult,
   VisitRepository,
@@ -30,14 +31,58 @@ export class PrismaVisitRepository implements VisitRepository {
     return specialty !== null;
   }
 
-  async create(data: CreateVisitData): Promise<Visit> {
-    return this.prisma.$transaction(async (transaction) => {
+  async create(
+  data: CreateVisitData,
+): Promise<CreateVisitResult> {
+  const scheduledEndAt = new Date(
+    data.preferredAt.getTime() + 60 * 60 * 1000,
+  );
+
+  return this.prisma.$transaction(
+    async (
+      transaction,
+    ): Promise<CreateVisitResult> => {
+      /*
+       * Serialize scheduling operations for this patient.
+       * This prevents two concurrent requests from both
+       * passing the overlap check.
+       */
+      await transaction.$executeRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtextextended(${data.patientId}::text, 0)
+        )
+      `;
+
+      const overlappingVisit =
+        await transaction.visit.findFirst({
+          where: {
+            patientId: data.patientId,
+            preferredAt: {
+              lt: scheduledEndAt,
+            },
+            scheduledEndAt: {
+              gt: data.preferredAt,
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
+
+      if (overlappingVisit) {
+        return {
+          success: false,
+          reason: "PATIENT_SCHEDULE_CONFLICT",
+        };
+      }
+
       const visit = await transaction.visit.create({
         data: {
           patientId: data.patientId,
           specialtyId: data.specialtyId,
           location: data.location,
           preferredAt: data.preferredAt,
+          scheduledEndAt,
         },
       });
 
@@ -50,20 +95,24 @@ export class PrismaVisitRepository implements VisitRepository {
       });
 
       return {
-        id: visit.id,
-        patientId: visit.patientId,
-        specialtyId: visit.specialtyId,
-        selectedBidId: visit.selectedBidId,
-        assignedDoctorProfileId:
-          visit.assignedDoctorProfileId,
-        location: visit.location,
-        preferredAt: visit.preferredAt,
-        status: visit.status,
-        createdAt: visit.createdAt,
-        updatedAt: visit.updatedAt,
+        success: true,
+        visit: {
+          id: visit.id,
+          patientId: visit.patientId,
+          specialtyId: visit.specialtyId,
+          selectedBidId: visit.selectedBidId,
+          assignedDoctorProfileId:
+            visit.assignedDoctorProfileId,
+          location: visit.location,
+          preferredAt: visit.preferredAt,
+          status: visit.status,
+          createdAt: visit.createdAt,
+          updatedAt: visit.updatedAt,
+        },
       };
-    });
-  }
+    },
+  );
+}
 
   async listSpecialties(): Promise<Specialty[]> {
   return this.prisma.specialty.findMany({
