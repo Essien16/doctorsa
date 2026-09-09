@@ -374,3 +374,5 @@ I would prioritise:
 3. Supporting reservation expiry and multiple payment attempts.
 4. Adding CSRF protection and login rate limiting.
 5. Adding cancellation and rescheduling.
+6. Implement logging with Pino/Winston
+
