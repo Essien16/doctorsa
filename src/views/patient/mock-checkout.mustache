@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    >
+    <title>{{title}} | DoctorSA</title>
+    <link rel="stylesheet" href="/public/styles.css">
+  </head>
+
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/patient/visits">
+        DoctorSA
+      </a>
+
+      <span class="mock-badge">Mock payment</span>
+    </header>
+
+    <main class="checkout-container">
+      <section class="checkout-card">
+        <p class="eyebrow">DoctorSA checkout</p>
+        <h1>Complete payment</h1>
+
+        <p class="muted">
+          This is a simulated payment. No card or bank
+          details are required.
+        </p>
+
+        <div class="checkout-amount">
+          <span>Amount</span>
+          <strong>{{payment.amount}}</strong>
+        </div>
+
+        <dl class="checkout-details">
+          <div>
+            <dt>Reference</dt>
+            <dd>{{payment.reference}}</dd>
+          </div>
+
+          <div>
+            <dt>Status</dt>
+            <dd>{{payment.status}}</dd>
+          </div>
+        </dl>
+
+        {{#isPending}}
+            <form
+                method="post"
+                action="/mock-payments/{{payment.id}}/confirm"
+            >
+                <input
+                type="hidden"
+                name="responseMode"
+                value="html"
+                >
+
+                <button type="submit">
+                Confirm mock payment
+                </button>
+            </form>
+
+            <a
+                class="cancel-link"
+                href="/patient/visits/{{payment.visitId}}"
+            >
+                Return to visit
+            </a>
+        {{/isPending}}
+
+        {{#isSucceeded}}
+          <div class="alert alert-success">
+            Payment has already been completed.
+          </div>
+
+          <a
+            class="button-link"
+            href="/patient/visits/{{payment.visitId}}"
+          >
+            View assigned visit
+          </a>
+        {{/isSucceeded}}
+
+        {{#isFailed}}
+          <div class="alert alert-error">
+            This payment was unsuccessful.
+          </div>
+        {{/isFailed}}
+      </section>
+    </main>
+  </body>
+</html>

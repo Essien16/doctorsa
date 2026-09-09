@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    >
+    <title>{{title}} | DoctorSA</title>
+    <link rel="stylesheet" href="/public/styles.css">
+  </head>
+
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/patient/visits">
+        DoctorSA
+      </a>
+
+      <form method="post" action="/logout">
+        <button class="button-secondary" type="submit">
+          Sign out
+        </button>
+      </form>
+    </header>
+
+    <main class="form-container">
+      <a class="back-link" href="/patient/visits">
+        ← Back to my visits
+      </a>
+
+      <section class="form-card">
+        <h1>Request a visit</h1>
+
+        <p class="muted">
+          Tell us where and when you need a doctor.
+        </p>
+
+        {{#errorMessage}}
+          <div class="alert alert-error" role="alert">
+            {{errorMessage}}
+          </div>
+        {{/errorMessage}}
+
+        <form method="post" action="/patient/visits">
+          <label for="specialtyId">Specialty</label>
+
+          <select
+            id="specialtyId"
+            name="specialtyId"
+            required
+          >
+            <option value="">Select a specialty</option>
+
+            {{#specialties}}
+              <option value="{{id}}" {{#selected}}selected{{/selected}}>
+                {{name}}
+              </option>
+            {{/specialties}}
+          </select>
+
+          {{#specialtyError}}
+            <p class="field-error">{{specialtyError}}</p>
+          {{/specialtyError}}
+
+          <label for="location">Location</label>
+
+          <input
+            id="location"
+            name="location"
+            type="text"
+            value="{{location}}"
+            placeholder="For example: Lekki, Lagos"
+            maxlength="255"
+            required
+          >
+
+          {{#locationError}}
+            <p class="field-error">{{locationError}}</p>
+          {{/locationError}}
+
+          <label for="preferredAt">
+            Preferred date and time
+          </label>
+
+          <input
+            id="preferredAt"
+            name="preferredAt"
+            type="datetime-local"
+            value="{{preferredAt}}"
+            required
+          >
+
+          {{#preferredAtError}}
+            <p class="field-error">{{preferredAtError}}</p>
+          {{/preferredAtError}}
+
+          <button type="submit">
+            Submit visit request
+          </button>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>

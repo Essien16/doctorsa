@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    >
+    <title>{{title}} | DoctorSA</title>
+    <link rel="stylesheet" href="/public/styles.css">
+  </head>
+
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/doctor/requests">
+        DoctorSA
+      </a>
+
+      <nav class="header-navigation">
+        <a
+          class="navigation-link active"
+          href="/doctor/requests"
+        >
+          Open requests
+        </a>
+
+        <a
+          class="navigation-link"
+          href="/doctor/assigned-visits"
+        >
+          Assigned visits
+        </a>
+
+        <form method="post" action="/logout">
+          <button
+            class="button-secondary"
+            type="submit"
+          >
+            Sign out
+          </button>
+        </form>
+      </nav>
+    </header>
+
+    <main class="page-container">
+      <div class="page-heading">
+        <div>
+          <h1>Open visit requests</h1>
+
+          <p class="muted">
+            Requests matching your medical specialty.
+          </p>
+        </div>
+      </div>
+
+      {{#successMessage}}
+        <div class="alert alert-success" role="status">
+          {{successMessage}}
+        </div>
+      {{/successMessage}}
+
+      {{#errorMessage}}
+        <div class="alert alert-error" role="alert">
+          {{errorMessage}}
+        </div>
+      {{/errorMessage}}
+
+      {{#hasVisits}}
+        <div class="request-grid">
+          {{#visits}}
+            <article class="request-card">
+              <div class="visit-card-heading">
+                <div>
+                  <p class="eyebrow">
+                    {{specialtyName}}
+                  </p>
+
+                  <h2>{{patientName}}</h2>
+                </div>
+
+                <span
+                  class="status status-{{statusClass}}"
+                >
+                  {{status}}
+                </span>
+              </div>
+
+              <dl class="details-list">
+                <div>
+                  <dt>Location</dt>
+                  <dd>{{location}}</dd>
+                </div>
+
+                <div>
+                  <dt>Preferred time</dt>
+                  <dd>{{preferredAt}}</dd>
+                </div>
+              </dl>
+
+              <form
+                class="bid-form"
+                method="post"
+                action="/doctor/requests/{{id}}/bids"
+              >
+                <div>
+                  <label for="amount-{{id}}">
+                    Bid amount
+                  </label>
+
+                  <input
+                    id="amount-{{id}}"
+                    name="amountInNaira"
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    placeholder="For example: 15000"
+                    required
+                  >
+                </div>
+
+                <div>
+                  <label for="note-{{id}}">
+                    Short note
+                  </label>
+
+                  <textarea
+                    id="note-{{id}}"
+                    name="note"
+                    maxlength="280"
+                    placeholder="Confirm your availability"
+                    required
+                  ></textarea>
+                </div>
+
+                <button type="submit">
+                  Submit bid
+                </button>
+              </form>
+            </article>
+          {{/visits}}
+        </div>
+      {{/hasVisits}}
+
+      {{^hasVisits}}
+        <section class="empty-state">
+          <h2>No matching requests</h2>
+
+          <p>
+            New requests matching your specialty will
+            appear here.
+          </p>
+        </section>
+      {{/hasVisits}}
+    </main>
+  </body>
+</html>

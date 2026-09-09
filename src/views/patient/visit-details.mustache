@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    >
+    <title>{{title}} | DoctorSA</title>
+    <link rel="stylesheet" href="/public/styles.css">
+  </head>
+
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/patient/visits">
+        DoctorSA
+      </a>
+
+      <form method="post" action="/logout">
+        <button
+          class="button-secondary"
+          type="submit"
+        >
+          Sign out
+        </button>
+      </form>
+    </header>
+
+    <main class="page-container">
+      <a class="back-link" href="/patient/visits">
+        ← Back to my visits
+      </a>
+
+      <section class="details-card">
+        <div class="visit-card-heading">
+          <div>
+            <p class="eyebrow">Visit request</p>
+            <h1>{{visit.specialtyName}}</h1>
+          </div>
+
+          <span
+            class="status status-{{visit.statusClass}}"
+          >
+            {{visit.status}}
+          </span>
+        </div>
+
+        <dl class="details-list">
+          <div>
+            <dt>Location</dt>
+            <dd>{{visit.location}}</dd>
+          </div>
+
+          <div>
+            <dt>Preferred time</dt>
+            <dd>{{visit.preferredAt}}</dd>
+          </div>
+
+          {{#visit.assignedDoctorName}}
+            <div>
+              <dt>Assigned doctor</dt>
+              <dd>{{visit.assignedDoctorName}}</dd>
+            </div>
+          {{/visit.assignedDoctorName}}
+        </dl>
+      </section>
+
+      {{#pendingPayment}}
+        <section class="payment-reminder">
+          <div>
+            <h2>Payment pending</h2>
+
+            <p>
+              You selected a doctor’s bid, but payment
+              has not been completed.
+            </p>
+          </div>
+
+          <a
+            class="button-link"
+            href="/mock-payments/{{id}}"
+          >
+            Continue payment
+          </a>
+        </section>
+      {{/pendingPayment}}
+
+      <section class="bids-section">
+        <div class="section-heading">
+          <h2>Doctor bids</h2>
+        </div>
+
+        {{#hasBids}}
+          <div class="bid-grid">
+            {{#bids}}
+              <article class="bid-card">
+                <div class="bid-heading">
+                  <div>
+                    <h3>{{doctorName}}</h3>
+
+                    <p class="bid-time">
+                      Submitted {{submittedAt}}
+                    </p>
+                  </div>
+
+                  <strong class="bid-amount">
+                    {{amount}}
+                  </strong>
+                </div>
+
+                <p class="bid-note">
+                  {{note}}
+                </p>
+
+                {{#selected}}
+                  <div class="selected-bid">
+                    Selected bid
+                  </div>
+                {{/selected}}
+
+                {{#canSelect}}
+                  <form
+                    method="post"
+                    action="/patient/visits/{{visitId}}/bids/{{id}}/select"
+                  >
+                    <button type="submit">
+                      Select and continue to payment
+                    </button>
+                  </form>
+                {{/canSelect}}
+              </article>
+            {{/bids}}
+          </div>
+        {{/hasBids}}
+
+        {{^hasBids}}
+          <section class="empty-state">
+            <h2>No bids yet</h2>
+
+            <p>
+              Suitable doctors will be able to bid on
+              this request.
+            </p>
+          </section>
+        {{/hasBids}}
+      </section>
+    </main>
+  </body>
+</html>

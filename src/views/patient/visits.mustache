@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    >
+    <title>{{title}} | DoctorSA</title>
+    <link rel="stylesheet" href="/public/styles.css">
+  </head>
+
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/patient/visits">
+        DoctorSA
+      </a>
+
+      <form method="post" action="/logout">
+        <button class="button-secondary" type="submit">
+          Sign out
+        </button>
+      </form>
+    </header>
+
+    <main class="page-container">
+      <div class="page-heading">
+        <div>
+          <h1>My visits</h1>
+          <p class="muted">
+            Track your visit requests and doctor bids.
+          </p>
+        </div>
+
+        <a class="button-link" href="/patient/visits/new">
+          Request a visit
+        </a>
+      </div>
+
+      {{#hasVisits}}
+        <div class="visit-grid">
+          {{#visits}}
+            <a
+              class="visit-card"
+              href="/patient/visits/{{id}}"
+            >
+              <div class="visit-card-heading">
+                <h2>{{specialtyName}}</h2>
+
+                <span class="status status-{{statusClass}}">
+                  {{status}}
+                </span>
+              </div>
+
+              <dl>
+                <div>
+                  <dt>Location</dt>
+                  <dd>{{location}}</dd>
+                </div>
+
+                <div>
+                  <dt>Preferred time</dt>
+                  <dd>{{preferredAt}}</dd>
+                </div>
+              </dl>
+            </a>
+          {{/visits}}
+        </div>
+      {{/hasVisits}}
+
+      {{^hasVisits}}
+        <section class="empty-state">
+          <h2>No visit requests yet</h2>
+          <p>
+            Submit a request and suitable doctors can bid.
+          </p>
+
+          <a class="button-link" href="/patient/visits/new">
+            Request your first visit
+          </a>
+        </section>
+      {{/hasVisits}}
+    </main>
+  </body>
+</html>

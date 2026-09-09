@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    >
+    <title>{{title}} | DoctorSA</title>
+    <link rel="stylesheet" href="/public/styles.css">
+  </head>
+
+  <body>
+    <main class="auth-page">
+      <section class="auth-card">
+        <div class="brand">DoctorSA</div>
+
+        <h1>Welcome back</h1>
+
+        <p class="muted">
+          Sign in to manage your visits.
+        </p>
+
+        {{#errorMessage}}
+          <div class="alert alert-error" role="alert">
+            {{errorMessage}}
+          </div>
+        {{/errorMessage}}
+
+        <form method="post" action="/login">
+          <label for="email">Email address</label>
+
+          <input
+            id="email"
+            name="email"
+            type="email"
+            value="{{email}}"
+            autocomplete="email"
+            required
+          >
+
+          <label for="password">Password</label>
+
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+          >
+
+          <button type="submit">Sign in</button>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>
