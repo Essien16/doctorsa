@@ -1,4 +1,4 @@
-import { AuthenticationError  } from "../../../shared/errors/authentication-error.js";
+import { AuthenticationError } from "../../../shared/errors/authentication-error.js";
 import type { PublicAuthUser } from "../domain/auth-user.js";
 import type { UserRepository } from "../domain/user.repository.js";
 

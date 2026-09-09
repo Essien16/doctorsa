@@ -48,27 +48,17 @@ export type SubmitBidResult =
     };
 
 export interface VisitRepository {
-  specialtyExists(
-    specialtyId: string,
-  ): Promise<boolean>;
+  specialtyExists(specialtyId: string): Promise<boolean>;
 
   listSpecialties(): Promise<Specialty[]>;
 
-  findDoctorProfileByUserId(
-    userId: string,
-  ): Promise<DoctorProfile | null>;
+  findDoctorProfileByUserId(userId: string): Promise<DoctorProfile | null>;
 
-  listOpenForSpecialty(
-    specialtyId: string,
-  ): Promise<OpenVisit[]>;
+  listOpenForSpecialty(specialtyId: string): Promise<OpenVisit[]>;
 
-  create(
-    data: CreateVisitData,
-  ): Promise<CreateVisitResult>;
+  create(data: CreateVisitData): Promise<CreateVisitResult>;
 
-  submitBid(
-    data: SubmitBidData,
-  ): Promise<SubmitBidResult>;
+  submitBid(data: SubmitBidData): Promise<SubmitBidResult>;
 
   findPatientVisitDetails(
     visitId: string,
@@ -79,7 +69,5 @@ export interface VisitRepository {
     doctorProfileId: string,
   ): Promise<AssignedVisit[]>;
 
-  listForPatient(
-    patientId: string,
-  ): Promise<PatientVisitSummary[]>;
+  listForPatient(patientId: string): Promise<PatientVisitSummary[]>;
 }

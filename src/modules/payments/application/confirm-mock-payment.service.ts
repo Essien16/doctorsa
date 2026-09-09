@@ -16,27 +16,22 @@ export interface ConfirmMockPaymentResult {
 }
 
 export class ConfirmMockPaymentService {
-  constructor(
-    private readonly paymentRepository: PaymentRepository,
-  ) {}
+  constructor(private readonly paymentRepository: PaymentRepository) {}
 
   async execute(
     input: ConfirmMockPaymentInput,
   ): Promise<ConfirmMockPaymentResult> {
-    const payment =
-      await this.paymentRepository.findForPatient(
-        input.paymentId,
-        input.patientId,
-      );
+    const payment = await this.paymentRepository.findForPatient(
+      input.paymentId,
+      input.patientId,
+    );
 
     if (!payment) {
       throw new NotFoundError("Payment");
     }
 
     if (payment.status !== "PENDING") {
-      throw new ConflictError(
-        "Only pending payments can be confirmed",
-      );
+      throw new ConflictError("Only pending payments can be confirmed");
     }
 
     return {
@@ -46,8 +41,7 @@ export class ConfirmMockPaymentService {
         type: "payment.succeeded",
         data: {
           paymentId: payment.id,
-          providerReference:
-            payment.providerReference,
+          providerReference: payment.providerReference,
         },
       },
     };

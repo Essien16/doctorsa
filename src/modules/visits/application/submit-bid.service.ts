@@ -13,15 +13,10 @@ export interface SubmitBidInput {
 }
 
 export class SubmitBidService {
-  constructor(
-    private readonly visitRepository: VisitRepository,
-  ) {}
+  constructor(private readonly visitRepository: VisitRepository) {}
 
   async execute(input: SubmitBidInput): Promise<Bid> {
-    if (
-      !Number.isSafeInteger(input.amountInKobo) ||
-      input.amountInKobo <= 0
-    ) {
+    if (!Number.isSafeInteger(input.amountInKobo) || input.amountInKobo <= 0) {
       throw new ValidationError(
         "Bid amount must be a positive integer in kobo",
       );
@@ -30,15 +25,11 @@ export class SubmitBidService {
     const note = input.note.trim();
 
     if (note.length < 2) {
-      throw new ValidationError(
-        "Bid note must contain at least 2 characters",
-      );
+      throw new ValidationError("Bid note must contain at least 2 characters");
     }
 
     if (note.length > 280) {
-      throw new ValidationError(
-        "Bid note cannot exceed 280 characters",
-      );
+      throw new ValidationError("Bid note cannot exceed 280 characters");
     }
 
     const result = await this.visitRepository.submitBid({
@@ -65,9 +56,7 @@ export class SubmitBidService {
         );
 
       case "VISIT_NOT_ACCEPTING_BIDS":
-        throw new ConflictError(
-          "This visit is no longer accepting bids",
-        );
+        throw new ConflictError("This visit is no longer accepting bids");
     }
   }
 }

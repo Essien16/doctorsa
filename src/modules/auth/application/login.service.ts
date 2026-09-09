@@ -1,7 +1,5 @@
 import { AuthenticationError } from "../../../shared/errors/authentication-error.js";
-import type {
-  PublicAuthUser,
-} from "../domain/auth-user.js";
+import type { PublicAuthUser } from "../domain/auth-user.js";
 import type { PasswordHasher } from "../domain/password-hasher.js";
 import type { UserRepository } from "../domain/user.repository.js";
 

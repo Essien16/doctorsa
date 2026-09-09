@@ -2,7 +2,7 @@ import express, { type Express } from "express";
 
 import { sessionMiddleware } from "./config/session.js";
 import { prisma } from "./infrastructure/database/prisma.js";
-import { authRouter } from "./modules/auth/auth.module.js";
+import { authRouter, authPageRouter } from "./modules/auth/auth.module.js";
 import { errorHandler } from "./shared/http/error-handler.js";
 import { notFoundHandler } from "./shared/http/not-found-handler.js";
 import {
@@ -11,12 +11,13 @@ import {
   patientPageRouter,
   doctorPageRouter,
 } from "./modules/visits/visit.module.js";
-import { paymentSelectionRouter, paymentWebhookRouter, mockPaymentRouter} from "./modules/payments/payment.module.js";
-import { configureViews } from "./config/views.js";
-import { authPageRouter } from "./modules/auth/auth.module.js";
 import {
-  paymentPageRouter,
+  paymentSelectionRouter,
+  paymentWebhookRouter,
+  mockPaymentRouter,
+  paymentPageRouter
 } from "./modules/payments/payment.module.js";
+import { configureViews } from "./config/views.js";
 
 export function createApp(): Express {
   const app = express();

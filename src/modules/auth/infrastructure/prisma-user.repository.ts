@@ -1,8 +1,5 @@
 import type { PrismaClient } from "../../../generated/prisma/client.js";
-import type {
-  AuthUser,
-  PublicAuthUser,
-} from "../domain/auth-user.js";
+import type { AuthUser, PublicAuthUser } from "../domain/auth-user.js";
 import type { UserRepository } from "../domain/user.repository.js";
 
 export class PrismaUserRepository implements UserRepository {

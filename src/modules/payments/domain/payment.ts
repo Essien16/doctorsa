@@ -1,7 +1,4 @@
-export type PaymentStatus =
-  | "PENDING"
-  | "SUCCEEDED"
-  | "FAILED";
+export type PaymentStatus = "PENDING" | "SUCCEEDED" | "FAILED";
 
 export interface Payment {
   id: string;

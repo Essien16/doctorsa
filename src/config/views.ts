@@ -9,8 +9,5 @@ export function configureViews(app: Express): void {
   app.set("view engine", "mustache");
   app.set("views", path.join(process.cwd(), "src/views"));
 
-  app.use(
-    "/public",
-    express.static(path.join(process.cwd(), "src/public")),
-  );
+  app.use("/public", express.static(path.join(process.cwd(), "src/public")));
 }

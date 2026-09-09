@@ -10,36 +10,29 @@ import type {
   SelectBidAndCreatePaymentData,
 } from "../domain/payment.repository.js";
 
-export class PrismaPaymentRepository
-  implements PaymentRepository
-{
+export class PrismaPaymentRepository implements PaymentRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async selectBidAndCreatePayment(
-  data: SelectBidAndCreatePaymentData,
-): Promise<CreatePaymentResult> {
-  return this.prisma.$transaction(
-    async (
-      transaction,
-    ): Promise<CreatePaymentResult> => {
-      const lockedVisits = await transaction.$queryRaw<
-        Array<{ id: string }>
-      >`
+    data: SelectBidAndCreatePaymentData,
+  ): Promise<CreatePaymentResult> {
+    return this.prisma.$transaction(
+      async (transaction): Promise<CreatePaymentResult> => {
+        const lockedVisits = await transaction.$queryRaw<{ id: string }[]>`
         SELECT "id"
         FROM "visits"
         WHERE "id" = ${data.visitId}::uuid
         FOR UPDATE
       `;
 
-      if (lockedVisits.length === 0) {
-        return {
-          success: false,
-          reason: "VISIT_NOT_FOUND",
-        };
-      }
+        if (lockedVisits.length === 0) {
+          return {
+            success: false,
+            reason: "VISIT_NOT_FOUND",
+          };
+        }
 
-      const visit =
-        await transaction.visit.findUnique({
+        const visit = await transaction.visit.findUnique({
           where: {
             id: data.visitId,
           },
@@ -59,75 +52,68 @@ export class PrismaPaymentRepository
           },
         });
 
-      if (
-        !visit ||
-        visit.patientId !== data.patientId
-      ) {
-        return {
-          success: false,
-          reason: "VISIT_NOT_FOUND",
-        };
-      }
+        if (!visit || visit.patientId !== data.patientId) {
+          return {
+            success: false,
+            reason: "VISIT_NOT_FOUND",
+          };
+        }
 
-      if (
-        visit.status !== "BIDDING" ||
-        visit.selectedBidId !== null ||
-        visit.reservedDoctorProfileId !== null
-      ) {
-        return {
-          success: false,
-          reason: "VISIT_NOT_SELECTABLE",
-        };
-      }
+        if (
+          visit.status !== "BIDDING" ||
+          visit.selectedBidId !== null ||
+          visit.reservedDoctorProfileId !== null
+        ) {
+          return {
+            success: false,
+            reason: "VISIT_NOT_SELECTABLE",
+          };
+        }
 
-      if (visit.payment) {
-        return {
-          success: false,
-          reason: "PAYMENT_ALREADY_EXISTS",
-        };
-      }
+        if (visit.payment) {
+          return {
+            success: false,
+            reason: "PAYMENT_ALREADY_EXISTS",
+          };
+        }
 
-      const bid = await transaction.bid.findFirst({
-        where: {
-          id: data.bidId,
-          visitId: visit.id,
-        },
-        select: {
-          id: true,
-          amountInKobo: true,
-          doctorProfileId: true,
-        },
-      });
+        const bid = await transaction.bid.findFirst({
+          where: {
+            id: data.bidId,
+            visitId: visit.id,
+          },
+          select: {
+            id: true,
+            amountInKobo: true,
+            doctorProfileId: true,
+          },
+        });
 
-      if (!bid) {
-        return {
-          success: false,
-          reason: "BID_NOT_FOUND",
-        };
-      }
+        if (!bid) {
+          return {
+            success: false,
+            reason: "BID_NOT_FOUND",
+          };
+        }
 
-      /*
-       * Serialize selection operations for this doctor.
-       * This prevents two patients selecting overlapping
-       * visits for the same doctor concurrently.
-       */
-      await transaction.$queryRaw`
-        SELECT pg_advisory_xact_lock(
-          hashtextextended(
-            ${bid.doctorProfileId}::text,
-            0
-          )
-        )
-      `;
+        /*
+         * Serialize selection operations for this doctor.
+         * This prevents two patients selecting overlapping
+         * visits for the same doctor concurrently.
+         */
+        await transaction.$queryRaw<{ lockResult: string }[]>`
+        SELECT
+            pg_advisory_xact_lock(
+            hashtextextended(${bid.doctorProfileId}, 0)
+            )::text AS "lockResult"
+        `;
 
-      const conflictingVisit =
-        await transaction.visit.findFirst({
+        const conflictingVisit = await transaction.visit.findFirst({
           where: {
             id: {
               not: visit.id,
             },
-            reservedDoctorProfileId:
-              bid.doctorProfileId,
+            reservedDoctorProfileId: bid.doctorProfileId,
             preferredAt: {
               lt: visit.scheduledEndAt,
             },
@@ -140,71 +126,66 @@ export class PrismaPaymentRepository
           },
         });
 
-      if (conflictingVisit) {
-        return {
-          success: false,
-          reason: "DOCTOR_SCHEDULE_CONFLICT",
-        };
-      }
+        if (conflictingVisit) {
+          return {
+            success: false,
+            reason: "DOCTOR_SCHEDULE_CONFLICT",
+          };
+        }
 
-      await transaction.visit.update({
-        where: {
-          id: visit.id,
-        },
-        data: {
-          selectedBidId: bid.id,
-          reservedDoctorProfileId:
-            bid.doctorProfileId,
+        await transaction.visit.update({
+          where: {
+            id: visit.id,
+          },
+          data: {
+            selectedBidId: bid.id,
+            reservedDoctorProfileId: bid.doctorProfileId,
 
-          /*
-           * Reserved for a future payment-expiry feature.
-           * It remains null in the current one-attempt
-           * mock-payment implementation.
-           */
-          doctorReservationExpiresAt: null,
-        },
-      });
+            /*
+             * Reserved for a future payment-expiry feature.
+             * It remains null in the current one-attempt
+             * mock-payment implementation.
+             */
+            doctorReservationExpiresAt: null,
+          },
+        });
 
-      const payment =
-        await transaction.payment.create({
+        const payment = await transaction.payment.create({
           data: {
             visitId: visit.id,
             bidId: bid.id,
-            providerReference:
-              data.providerReference,
+            providerReference: data.providerReference,
             amountInKobo: bid.amountInKobo,
             status: "PENDING",
           },
         });
 
-      const domainPayment: Payment = {
-        id: payment.id,
-        visitId: payment.visitId,
-        bidId: payment.bidId,
-        providerReference:
-          payment.providerReference,
-        amountInKobo: payment.amountInKobo,
-        status: payment.status,
-        paidAt: payment.paidAt,
-        createdAt: payment.createdAt,
-        updatedAt: payment.updatedAt,
-      };
+        const domainPayment: Payment = {
+          id: payment.id,
+          visitId: payment.visitId,
+          bidId: payment.bidId,
+          providerReference: payment.providerReference,
+          amountInKobo: payment.amountInKobo,
+          status: payment.status,
+          paidAt: payment.paidAt,
+          createdAt: payment.createdAt,
+          updatedAt: payment.updatedAt,
+        };
 
-      return {
-        success: true,
-        payment: domainPayment,
-      };
-    },
-  );
-}
+        return {
+          success: true,
+          payment: domainPayment,
+        };
+      },
+    );
+  }
 
   async processSuccessfulPayment(
-  event: PaymentSucceededEvent,
-): Promise<ProcessPaymentResult> {
-  return this.prisma.$transaction(
-    async (transaction): Promise<ProcessPaymentResult> => {
-      const existingEvent =
-        await transaction.webhookEvent.findUnique({
+    event: PaymentSucceededEvent,
+  ): Promise<ProcessPaymentResult> {
+    return this.prisma.$transaction(
+      async (transaction): Promise<ProcessPaymentResult> => {
+        const existingEvent = await transaction.webhookEvent.findUnique({
           where: {
             providerEventId: event.id,
           },
@@ -213,16 +194,15 @@ export class PrismaPaymentRepository
           },
         });
 
-      if (existingEvent) {
-        return {
-          success: true,
-          duplicate: true,
-          alreadyProcessed: false,
-        };
-      }
+        if (existingEvent) {
+          return {
+            success: true,
+            duplicate: true,
+            alreadyProcessed: false,
+          };
+        }
 
-      const paymentReference =
-        await transaction.payment.findUnique({
+        const paymentReference = await transaction.payment.findUnique({
           where: {
             id: event.data.paymentId,
           },
@@ -231,84 +211,78 @@ export class PrismaPaymentRepository
           },
         });
 
-      if (!paymentReference) {
-        return {
-          success: false,
-          reason: "PAYMENT_NOT_FOUND",
-        };
-      }
+        if (!paymentReference) {
+          return {
+            success: false,
+            reason: "PAYMENT_NOT_FOUND",
+          };
+        }
 
-      const lockedVisits = await transaction.$queryRaw<
-        Array<{ id: string }>
-      >`
+        const lockedVisits = await transaction.$queryRaw<{ id: string }[]>`
         SELECT "id"
         FROM "visits"
         WHERE "id" = ${paymentReference.visitId}::uuid
         FOR UPDATE
       `;
 
-      if (lockedVisits.length === 0) {
-        return {
-          success: false,
-          reason: "PAYMENT_NOT_FOUND",
-        };
-      }
+        if (lockedVisits.length === 0) {
+          return {
+            success: false,
+            reason: "PAYMENT_NOT_FOUND",
+          };
+        }
 
-      const lockedPayments = await transaction.$queryRaw<
-        Array<{ id: string }>
-      >`
+        const lockedPayments = await transaction.$queryRaw<
+          { id: string }[]
+        >`
         SELECT "id"
         FROM "payments"
         WHERE "id" = ${event.data.paymentId}::uuid
         FOR UPDATE
       `;
 
-      if (lockedPayments.length === 0) {
-        return {
-          success: false,
-          reason: "PAYMENT_NOT_FOUND",
-        };
-      }
+        if (lockedPayments.length === 0) {
+          return {
+            success: false,
+            reason: "PAYMENT_NOT_FOUND",
+          };
+        }
 
-      const payment = await transaction.payment.findUnique({
-        where: {
-          id: event.data.paymentId,
-        },
-        select: {
-          id: true,
-          visitId: true,
-          bidId: true,
-          providerReference: true,
-          status: true,
-          bid: {
-            select: {
-              doctorProfileId: true,
+        const payment = await transaction.payment.findUnique({
+          where: {
+            id: event.data.paymentId,
+          },
+          select: {
+            id: true,
+            visitId: true,
+            bidId: true,
+            providerReference: true,
+            status: true,
+            bid: {
+              select: {
+                doctorProfileId: true,
+              },
             },
           },
-        },
-      });
+        });
 
-      if (!payment) {
-        return {
-          success: false,
-          reason: "PAYMENT_NOT_FOUND",
-        };
-      }
+        if (!payment) {
+          return {
+            success: false,
+            reason: "PAYMENT_NOT_FOUND",
+          };
+        }
 
-      if (
-        payment.providerReference !==
-        event.data.providerReference
-      ) {
-        return {
-          success: false,
-          reason: "PAYMENT_DATA_MISMATCH",
-        };
-      }
+        if (payment.providerReference !== event.data.providerReference) {
+          return {
+            success: false,
+            reason: "PAYMENT_DATA_MISMATCH",
+          };
+        }
 
-      
-      const insertedEvents = await transaction.$queryRaw<
-        Array<{ id: string }>
-      >`
+        const insertedEvents = await transaction.$queryRaw<
+          { id: string }[]
+        >`
         INSERT INTO "webhook_events" (
           "id",
           "provider_event_id",
@@ -328,133 +302,130 @@ export class PrismaPaymentRepository
         RETURNING "id"
       `;
 
-      if (insertedEvents.length === 0) {
-        return {
-          success: true,
-          duplicate: true,
-          alreadyProcessed: false,
-        };
-      }
+        if (insertedEvents.length === 0) {
+          return {
+            success: true,
+            duplicate: true,
+            alreadyProcessed: false,
+          };
+        }
 
-      if (payment.status === "SUCCEEDED") {
-        return {
-          success: true,
-          duplicate: false,
-          alreadyProcessed: true,
-        };
-      }
+        if (payment.status === "SUCCEEDED") {
+          return {
+            success: true,
+            duplicate: false,
+            alreadyProcessed: true,
+          };
+        }
 
-      const visit =
-        await transaction.visit.findUnique({
-            where: {
+        const visit = await transaction.visit.findUnique({
+          where: {
             id: payment.visitId,
-            },
-            select: {
+          },
+          select: {
             id: true,
             status: true,
             selectedBidId: true,
             reservedDoctorProfileId: true,
-            },
-      });
+          },
+        });
 
-      if (
-        !visit ||
-        visit.status !== "BIDDING" ||
-        visit.selectedBidId !== payment.bidId ||
-        visit.reservedDoctorProfileId !==
-            payment.bid.doctorProfileId ||
-        payment.status !== "PENDING"
+        if (
+          !visit ||
+          visit.status !== "BIDDING" ||
+          visit.selectedBidId !== payment.bidId ||
+          visit.reservedDoctorProfileId !== payment.bid.doctorProfileId ||
+          payment.status !== "PENDING"
         ) {
-        return {
+          return {
             success: false,
             reason: "VISIT_NOT_PAYABLE",
+          };
+        }
+
+        const paidAt = new Date();
+
+        await transaction.payment.update({
+          where: {
+            id: payment.id,
+          },
+          data: {
+            status: "SUCCEEDED",
+            paidAt,
+          },
+        });
+
+        await transaction.visit.update({
+          where: {
+            id: visit.id,
+          },
+          data: {
+            status: "PAID",
+          },
+        });
+
+        await transaction.visitStatusHistory.create({
+          data: {
+            visitId: visit.id,
+            fromStatus: "BIDDING",
+            toStatus: "PAID",
+          },
+        });
+
+        await transaction.visit.update({
+          where: {
+            id: visit.id,
+          },
+          data: {
+            status: "ASSIGNED",
+            assignedDoctorProfileId: payment.bid.doctorProfileId,
+          },
+        });
+
+        await transaction.visitStatusHistory.create({
+          data: {
+            visitId: visit.id,
+            fromStatus: "PAID",
+            toStatus: "ASSIGNED",
+          },
+        });
+
+        return {
+          success: true,
+          duplicate: false,
+          alreadyProcessed: false,
         };
-      }
-
-      const paidAt = new Date();
-
-      await transaction.payment.update({
-        where: {
-          id: payment.id,
-        },
-        data: {
-          status: "SUCCEEDED",
-          paidAt,
-        },
-      });
-
-      await transaction.visit.update({
-        where: {
-          id: visit.id,
-        },
-        data: {
-          status: "PAID",
-        },
-      });
-
-      await transaction.visitStatusHistory.create({
-        data: {
-          visitId: visit.id,
-          fromStatus: "BIDDING",
-          toStatus: "PAID",
-        },
-      });
-
-      await transaction.visit.update({
-        where: {
-          id: visit.id,
-        },
-        data: {
-          status: "ASSIGNED",
-          assignedDoctorProfileId:
-            payment.bid.doctorProfileId,
-        },
-      });
-
-      await transaction.visitStatusHistory.create({
-        data: {
-          visitId: visit.id,
-          fromStatus: "PAID",
-          toStatus: "ASSIGNED",
-        },
-      });
-
-      return {
-        success: true,
-        duplicate: false,
-        alreadyProcessed: false,
-      };
-    },
-  );
-}
-
-async findForPatient(
-  paymentId: string,
-  patientId: string,
-): Promise<Payment | null> {
-  const payment = await this.prisma.payment.findFirst({
-    where: {
-      id: paymentId,
-      visit: {
-        patientId,
       },
-    },
-  });
-
-  if (!payment) {
-    return null;
+    );
   }
 
-  return {
-    id: payment.id,
-    visitId: payment.visitId,
-    bidId: payment.bidId,
-    providerReference: payment.providerReference,
-    amountInKobo: payment.amountInKobo,
-    status: payment.status,
-    paidAt: payment.paidAt,
-    createdAt: payment.createdAt,
-    updatedAt: payment.updatedAt,
-  };
-}
+  async findForPatient(
+    paymentId: string,
+    patientId: string,
+  ): Promise<Payment | null> {
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        id: paymentId,
+        visit: {
+          patientId,
+        },
+      },
+    });
+
+    if (!payment) {
+      return null;
+    }
+
+    return {
+      id: payment.id,
+      visitId: payment.visitId,
+      bidId: payment.bidId,
+      providerReference: payment.providerReference,
+      amountInKobo: payment.amountInKobo,
+      status: payment.status,
+      paidAt: payment.paidAt,
+      createdAt: payment.createdAt,
+      updatedAt: payment.updatedAt,
+    };
+  }
 }

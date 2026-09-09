@@ -19,28 +19,19 @@ import { createDoctorPageRouter } from "./presentation/doctor-page.routes.js";
 
 const visitRepository = new PrismaVisitRepository(prisma);
 
-const createVisitService = new CreateVisitService(
+const createVisitService = new CreateVisitService(visitRepository);
+
+const listSpecialtiesService = new ListSpecialtiesService(visitRepository);
+
+const listOpenVisitsService = new ListOpenVisitsService(visitRepository);
+
+const submitBidService = new SubmitBidService(visitRepository);
+
+const getPatientVisitService = new GetPatientVisitService(visitRepository);
+
+const listAssignedVisitsService = new ListAssignedVisitsService(
   visitRepository,
 );
-
-const listSpecialtiesService = new ListSpecialtiesService(
-  visitRepository,
-);
-
-const listOpenVisitsService = new ListOpenVisitsService(
-  visitRepository,
-);
-
-const submitBidService = new SubmitBidService(
-  visitRepository,
-);
-
-const getPatientVisitService = new GetPatientVisitService(
-  visitRepository,
-);
-
-const listAssignedVisitsService =
-  new ListAssignedVisitsService(visitRepository);
 
 const visitController = new VisitController(
   createVisitService,
@@ -51,8 +42,7 @@ const visitController = new VisitController(
   listAssignedVisitsService,
 );
 
-const listPatientVisitsService =
-  new ListPatientVisitsService(visitRepository);
+const listPatientVisitsService = new ListPatientVisitsService(visitRepository);
 
 const patientPageController = new PatientPageController(
   listPatientVisitsService,
@@ -69,11 +59,8 @@ const doctorPageController = new DoctorPageController(
 
 export const visitRouter = createVisitRouter(visitController);
 
-export const specialtyRouter =
-  createSpecialtyRouter(visitController);
+export const specialtyRouter = createSpecialtyRouter(visitController);
 
-export const patientPageRouter =
-  createPatientPageRouter(patientPageController);
+export const patientPageRouter = createPatientPageRouter(patientPageController);
 
-export const doctorPageRouter =
-  createDoctorPageRouter(doctorPageController);
+export const doctorPageRouter = createDoctorPageRouter(doctorPageController);

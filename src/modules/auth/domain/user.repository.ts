@@ -1,7 +1,4 @@
-import type {
-  AuthUser,
-  PublicAuthUser,
-} from "./auth-user.js";
+import type { AuthUser, PublicAuthUser } from "./auth-user.js";
 
 export interface UserRepository {
   findByEmail(email: string): Promise<AuthUser | null>;

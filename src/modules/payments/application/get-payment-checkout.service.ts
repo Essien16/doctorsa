@@ -8,19 +8,13 @@ export interface GetPaymentCheckoutInput {
 }
 
 export class GetPaymentCheckoutService {
-  constructor(
-    private readonly paymentRepository:
-      PaymentRepository,
-  ) {}
+  constructor(private readonly paymentRepository: PaymentRepository) {}
 
-  async execute(
-    input: GetPaymentCheckoutInput,
-  ): Promise<Payment> {
-    const payment =
-      await this.paymentRepository.findForPatient(
-        input.paymentId,
-        input.patientId,
-      );
+  async execute(input: GetPaymentCheckoutInput): Promise<Payment> {
+    const payment = await this.paymentRepository.findForPatient(
+      input.paymentId,
+      input.patientId,
+    );
 
     if (!payment) {
       throw new NotFoundError("Payment");

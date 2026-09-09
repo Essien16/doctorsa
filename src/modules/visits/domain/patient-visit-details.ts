@@ -1,9 +1,6 @@
 import type { VisitStatus } from "./visit-status.js";
 
-export type PatientPaymentStatus =
-  | "PENDING"
-  | "SUCCEEDED"
-  | "FAILED";
+export type PatientPaymentStatus = "PENDING" | "SUCCEEDED" | "FAILED";
 
 export interface PatientBid {
   id: string;

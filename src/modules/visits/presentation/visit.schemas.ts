@@ -1,9 +1,7 @@
 import { z } from "zod";
 
 export const createVisitRequestSchema = z.object({
-  specialtyId: z
-    .string()
-    .uuid("Specialty ID must be a valid UUID"),
+  specialtyId: z.string().uuid("Specialty ID must be a valid UUID"),
 
   location: z
     .string()
@@ -21,9 +19,7 @@ export const createVisitRequestSchema = z.object({
 });
 
 export const visitIdParamsSchema = z.object({
-  visitId: z
-    .string()
-    .uuid("Visit ID must be a valid UUID"),
+  visitId: z.string().uuid("Visit ID must be a valid UUID"),
 });
 
 export const submitBidRequestSchema = z.object({
@@ -31,10 +27,7 @@ export const submitBidRequestSchema = z.object({
     .number()
     .int("Bid amount must be an integer")
     .positive("Bid amount must be positive")
-    .max(
-      2_147_483_647,
-      "Bid amount exceeds the supported limit",
-    ),
+    .max(2_147_483_647, "Bid amount exceeds the supported limit"),
 
   note: z
     .string()
@@ -44,9 +37,7 @@ export const submitBidRequestSchema = z.object({
 });
 
 export const createVisitPageSchema = z.object({
-  specialtyId: z.string().uuid(
-    "Select a valid specialty",
-  ),
+  specialtyId: z.string().uuid("Select a valid specialty"),
   location: z
     .string()
     .trim()
@@ -64,10 +55,7 @@ export const submitBidPageSchema = z.object({
   amountInNaira: z.coerce
     .number()
     .positive("Bid amount must be greater than zero")
-    .multipleOf(
-      0.01,
-      "Bid amount cannot have more than two decimal places",
-    ),
+    .multipleOf(0.01, "Bid amount cannot have more than two decimal places"),
   note: z
     .string()
     .trim()
@@ -75,6 +63,4 @@ export const submitBidPageSchema = z.object({
     .max(280, "The note cannot exceed 280 characters"),
 });
 
-export type CreateVisitPageInput = z.infer<
-  typeof createVisitPageSchema
->;
+export type CreateVisitPageInput = z.infer<typeof createVisitPageSchema>;

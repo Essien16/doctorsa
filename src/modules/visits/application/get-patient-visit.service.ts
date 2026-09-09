@@ -8,18 +8,13 @@ export interface GetPatientVisitInput {
 }
 
 export class GetPatientVisitService {
-  constructor(
-    private readonly visitRepository: VisitRepository,
-  ) {}
+  constructor(private readonly visitRepository: VisitRepository) {}
 
-  async execute(
-    input: GetPatientVisitInput,
-  ): Promise<PatientVisitDetails> {
-    const visit =
-      await this.visitRepository.findPatientVisitDetails(
-        input.visitId,
-        input.patientId,
-      );
+  async execute(input: GetPatientVisitInput): Promise<PatientVisitDetails> {
+    const visit = await this.visitRepository.findPatientVisitDetails(
+      input.visitId,
+      input.patientId,
+    );
 
     if (!visit) {
       throw new NotFoundError("Visit");

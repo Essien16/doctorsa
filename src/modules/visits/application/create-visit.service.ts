@@ -15,50 +15,39 @@ type Clock = () => Date;
 
 export class CreateVisitService {
   constructor(
-    private readonly visitRepository:
-      VisitRepository,
+    private readonly visitRepository: VisitRepository,
     private readonly clock: Clock = () => new Date(),
   ) {}
 
-  async execute(
-    input: CreateVisitInput,
-  ): Promise<Visit> {
+  async execute(input: CreateVisitInput): Promise<Visit> {
     const location = input.location.trim();
 
     if (location.length < 2) {
-      throw new ValidationError(
-        "Location must contain at least 2 characters",
-      );
+      throw new ValidationError("Location must contain at least 2 characters");
     }
 
     if (Number.isNaN(input.preferredAt.getTime())) {
-      throw new ValidationError(
-        "Preferred time is invalid",
-      );
+      throw new ValidationError("Preferred time is invalid");
     }
 
     if (input.preferredAt <= this.clock()) {
-      throw new ValidationError(
-        "Preferred time must be in the future",
-      );
+      throw new ValidationError("Preferred time must be in the future");
     }
 
-    const specialtyExists =
-      await this.visitRepository.specialtyExists(
-        input.specialtyId,
-      );
+    const specialtyExists = await this.visitRepository.specialtyExists(
+      input.specialtyId,
+    );
 
     if (!specialtyExists) {
       throw new NotFoundError("Specialty");
     }
 
-    const result =
-      await this.visitRepository.create({
-        patientId: input.patientId,
-        specialtyId: input.specialtyId,
-        location,
-        preferredAt: input.preferredAt,
-      });
+    const result = await this.visitRepository.create({
+      patientId: input.patientId,
+      specialtyId: input.specialtyId,
+      location,
+      preferredAt: input.preferredAt,
+    });
 
     if (!result.success) {
       throw new ConflictError(

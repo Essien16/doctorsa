@@ -1,8 +1,4 @@
-import type {
-  NextFunction,
-  Request,
-  Response,
-} from "express";
+import type { NextFunction, Request, Response } from "express";
 
 import { AppError } from "../../../shared/errors/app-error.js";
 import { AuthenticationError } from "../../../shared/errors/authentication-error.js";
@@ -12,10 +8,8 @@ import { paymentIdParamsSchema } from "./payment.schemas.js";
 
 export class MockPaymentController {
   constructor(
-    private readonly confirmMockPaymentService:
-      ConfirmMockPaymentService,
-    private readonly signatureService:
-      WebhookSignatureService,
+    private readonly confirmMockPaymentService: ConfirmMockPaymentService,
+    private readonly signatureService: WebhookSignatureService,
     private readonly applicationBaseUrl: string,
   ) {}
 
@@ -31,35 +25,28 @@ export class MockPaymentController {
         throw new AuthenticationError();
       }
 
-      const validation = paymentIdParamsSchema.safeParse(
-        request.params,
-      );
+      const validation = paymentIdParamsSchema.safeParse(request.params);
 
       if (!validation.success) {
         response.status(400).json({
           error: {
             code: "VALIDATION_ERROR",
             message: "The payment ID is invalid",
-            details:
-              validation.error.flatten().fieldErrors,
+            details: validation.error.flatten().fieldErrors,
           },
         });
 
         return;
       }
 
-      const confirmation =
-        await this.confirmMockPaymentService.execute({
-          paymentId: validation.data.paymentId,
-          patientId,
-        });
+      const confirmation = await this.confirmMockPaymentService.execute({
+        paymentId: validation.data.paymentId,
+        patientId,
+      });
 
-      const rawBody = JSON.stringify(
-        confirmation.event,
-      );
+      const rawBody = JSON.stringify(confirmation.event);
 
-      const signature =
-        this.signatureService.sign(rawBody);
+      const signature = this.signatureService.sign(rawBody);
 
       const webhookResponse = await fetch(
         `${this.applicationBaseUrl}/webhooks/payments`,
@@ -73,8 +60,7 @@ export class MockPaymentController {
         },
       );
 
-      const webhookResult: unknown =
-        await webhookResponse.json();
+      const webhookResult: unknown = await webhookResponse.json();
 
       if (!webhookResponse.ok) {
         throw new AppError(
@@ -85,10 +71,7 @@ export class MockPaymentController {
       }
 
       if (request.body?.responseMode === "html") {
-        response.redirect(
-          303,
-          `/patient/visits/${confirmation.visitId}`,
-        );
+        response.redirect(303, `/patient/visits/${confirmation.visitId}`);
 
         return;
       }

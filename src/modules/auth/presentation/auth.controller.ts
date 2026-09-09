@@ -1,8 +1,4 @@
-import type {
-  NextFunction,
-  Request,
-  Response,
-} from "express";
+import type { NextFunction, Request, Response } from "express";
 
 import type { GetCurrentUserService } from "../application/get-current-user.service.js";
 import type { LoginService } from "../application/login.service.js";

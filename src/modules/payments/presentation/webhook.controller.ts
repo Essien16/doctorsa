@@ -1,8 +1,4 @@
-import type {
-  NextFunction,
-  Request,
-  Response,
-} from "express";
+import type { NextFunction, Request, Response } from "express";
 
 import type { ProcessPaymentWebhookService } from "../application/process-payment-webhook.service.js";
 import type { WebhookSignatureService } from "../domain/webhook-signature.service.js";
@@ -10,10 +6,8 @@ import { paymentSucceededEventSchema } from "./payment.schemas.js";
 
 export class WebhookController {
   constructor(
-    private readonly processPaymentWebhookService:
-      ProcessPaymentWebhookService,
-    private readonly signatureService:
-      WebhookSignatureService,
+    private readonly processPaymentWebhookService: ProcessPaymentWebhookService,
+    private readonly signatureService: WebhookSignatureService,
   ) {}
 
   handle = async (
@@ -35,14 +29,9 @@ export class WebhookController {
 
       const rawBody = request.body.toString("utf8");
 
-      const signature = request.header(
-        "x-webhook-signature",
-      );
+      const signature = request.header("x-webhook-signature");
 
-      if (
-        !signature ||
-        !this.signatureService.verify(rawBody, signature)
-      ) {
+      if (!signature || !this.signatureService.verify(rawBody, signature)) {
         response.status(401).json({
           error: {
             code: "INVALID_WEBHOOK_SIGNATURE",
@@ -68,8 +57,7 @@ export class WebhookController {
         return;
       }
 
-      const validation =
-        paymentSucceededEventSchema.safeParse(parsedBody);
+      const validation = paymentSucceededEventSchema.safeParse(parsedBody);
 
       if (!validation.success) {
         response.status(400).json({
@@ -83,19 +71,14 @@ export class WebhookController {
         return;
       }
 
-      const result =
-        await this.processPaymentWebhookService.execute(
-          validation.data,
-        );
+      const result = await this.processPaymentWebhookService.execute(
+        validation.data,
+      );
 
       response.status(200).json({
         received: true,
-        duplicate: result.success
-          ? result.duplicate
-          : false,
-        alreadyProcessed: result.success
-          ? result.alreadyProcessed
-          : false,
+        duplicate: result.success ? result.duplicate : false,
+        alreadyProcessed: result.success ? result.alreadyProcessed : false,
       });
     } catch (error) {
       next(error);

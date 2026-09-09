@@ -1,18 +1,11 @@
-import type {
-  NextFunction,
-  Request,
-  Response,
-} from "express";
+import type { NextFunction, Request, Response } from "express";
 
 import { AuthenticationError } from "../../../shared/errors/authentication-error.js";
 import type { CreatePaymentService } from "../application/create-payment.service.js";
 import { selectBidParamsSchema } from "./payment.schemas.js";
 
 export class PaymentController {
-  constructor(
-    private readonly createPaymentService:
-      CreatePaymentService,
-  ) {}
+  constructor(private readonly createPaymentService: CreatePaymentService) {}
 
   selectBid = async (
     request: Request,
@@ -24,9 +17,7 @@ export class PaymentController {
         throw new AuthenticationError();
       }
 
-      const validation = selectBidParamsSchema.safeParse(
-        request.params,
-      );
+      const validation = selectBidParamsSchema.safeParse(request.params);
 
       if (!validation.success) {
         response.status(400).json({

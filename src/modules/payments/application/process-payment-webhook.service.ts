@@ -7,17 +7,10 @@ import type {
 } from "../domain/payment.repository.js";
 
 export class ProcessPaymentWebhookService {
-  constructor(
-    private readonly paymentRepository: PaymentRepository,
-  ) {}
+  constructor(private readonly paymentRepository: PaymentRepository) {}
 
-  async execute(
-    event: PaymentSucceededEvent,
-  ): Promise<ProcessPaymentResult> {
-    const result =
-      await this.paymentRepository.processSuccessfulPayment(
-        event,
-      );
+  async execute(event: PaymentSucceededEvent): Promise<ProcessPaymentResult> {
+    const result = await this.paymentRepository.processSuccessfulPayment(event);
 
     if (result.success) {
       return result;
@@ -33,9 +26,7 @@ export class ProcessPaymentWebhookService {
         );
 
       case "VISIT_NOT_PAYABLE":
-        throw new ConflictError(
-          "The visit is not in a payable state",
-        );
+        throw new ConflictError("The visit is not in a payable state");
     }
   }
 }

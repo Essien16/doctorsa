@@ -18,35 +18,29 @@ import { GetPaymentCheckoutService } from "./application/get-payment-checkout.se
 
 const paymentRepository = new PrismaPaymentRepository(prisma);
 
-const referenceGenerator =
-  new MockPaymentReferenceGenerator();
+const referenceGenerator = new MockPaymentReferenceGenerator();
 
 const createPaymentService = new CreatePaymentService(
   paymentRepository,
   referenceGenerator,
 );
 
-const paymentController = new PaymentController(
-  createPaymentService,
+const paymentController = new PaymentController(createPaymentService);
+
+const signatureService = new HmacWebhookSignatureService(env.WEBHOOK_SECRET);
+
+const processPaymentWebhookService = new ProcessPaymentWebhookService(
+  paymentRepository,
 );
-
-const signatureService =
-  new HmacWebhookSignatureService(
-    env.WEBHOOK_SECRET,
-  );
-
-const processPaymentWebhookService =
-  new ProcessPaymentWebhookService(
-    paymentRepository,
-  );
 
 const webhookController = new WebhookController(
   processPaymentWebhookService,
   signatureService,
 );
 
-const confirmMockPaymentService =
-  new ConfirmMockPaymentService(paymentRepository);
+const confirmMockPaymentService = new ConfirmMockPaymentService(
+  paymentRepository,
+);
 
 const mockPaymentController = new MockPaymentController(
   confirmMockPaymentService,
@@ -54,8 +48,9 @@ const mockPaymentController = new MockPaymentController(
   env.APP_BASE_URL,
 );
 
-const getPaymentCheckoutService =
-  new GetPaymentCheckoutService(paymentRepository);
+const getPaymentCheckoutService = new GetPaymentCheckoutService(
+  paymentRepository,
+);
 
 const paymentPageController = new PaymentPageController(
   createPaymentService,
@@ -68,8 +63,6 @@ export const paymentSelectionRouter =
 export const paymentWebhookRouter =
   createPaymentWebhookRouter(webhookController);
 
-export const mockPaymentRouter =
-  createMockPaymentRouter(mockPaymentController);
+export const mockPaymentRouter = createMockPaymentRouter(mockPaymentController);
 
-export const paymentPageRouter =
-  createPaymentPageRouter(paymentPageController);
+export const paymentPageRouter = createPaymentPageRouter(paymentPageController);

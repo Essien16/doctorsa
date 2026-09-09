@@ -1,0 +1,15 @@
+node_modules
+node_modules.backup
+dist
+coverage
+.git
+.gitignore
+.env
+.env.test
+cookies.txt
+patient-cookies.txt
+doctor-cookies.txt
+package-lock.backup.json
+npm-debug.log
+README.md
+tests

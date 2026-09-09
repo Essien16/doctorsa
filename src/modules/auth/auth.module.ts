@@ -11,26 +11,14 @@ import { createAuthPageRouter } from "./presentation/auth-page.routes.js";
 const userRepository = new PrismaUserRepository(prisma);
 const passwordHasher = new BcryptPasswordHasher();
 
-const loginService = new LoginService(
-  userRepository,
-  passwordHasher,
-);
+const loginService = new LoginService(userRepository, passwordHasher);
 
-const getCurrentUserService = new GetCurrentUserService(
-  userRepository,
-);
+const getCurrentUserService = new GetCurrentUserService(userRepository);
 
-const authController = new AuthController(
-  loginService,
-  getCurrentUserService,
-);
+const authController = new AuthController(loginService, getCurrentUserService);
 
-const authPageController = new AuthPageController(
-  loginService,
-);
+const authPageController = new AuthPageController(loginService);
 
-export const authPageRouter =
-  createAuthPageRouter(authPageController);
+export const authPageRouter = createAuthPageRouter(authPageController);
 
 export const authRouter = createAuthRouter(authController);
-

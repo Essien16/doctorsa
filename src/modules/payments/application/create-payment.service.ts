@@ -12,26 +12,19 @@ export interface CreatePaymentInput {
 
 export class CreatePaymentService {
   constructor(
-    private readonly paymentRepository:
-      PaymentRepository,
-    private readonly referenceGenerator:
-      PaymentReferenceGenerator,
+    private readonly paymentRepository: PaymentRepository,
+    private readonly referenceGenerator: PaymentReferenceGenerator,
   ) {}
 
-  async execute(
-    input: CreatePaymentInput,
-  ): Promise<Payment> {
-    const providerReference =
-      this.referenceGenerator.generate();
+  async execute(input: CreatePaymentInput): Promise<Payment> {
+    const providerReference = this.referenceGenerator.generate();
 
-    const result =
-      await this.paymentRepository
-        .selectBidAndCreatePayment({
-          patientId: input.patientId,
-          visitId: input.visitId,
-          bidId: input.bidId,
-          providerReference,
-        });
+    const result = await this.paymentRepository.selectBidAndCreatePayment({
+      patientId: input.patientId,
+      visitId: input.visitId,
+      bidId: input.bidId,
+      providerReference,
+    });
 
     if (result.success) {
       return result.payment;
@@ -50,9 +43,7 @@ export class CreatePaymentService {
         );
 
       case "PAYMENT_ALREADY_EXISTS":
-        throw new ConflictError(
-          "A payment already exists for this visit",
-        );
+        throw new ConflictError("A payment already exists for this visit");
 
       case "DOCTOR_SCHEDULE_CONFLICT":
         throw new ConflictError(

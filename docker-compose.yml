@@ -1,0 +1,65 @@
+services:
+  database:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: doctorsa
+      POSTGRES_USER: doctorsa_user
+      POSTGRES_PASSWORD: doctorsa_dev_password
+    volumes:
+      - doctorsa_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U doctorsa_user -d doctorsa",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://doctorsa_user:doctorsa_dev_password@database:5432/doctorsa
+
+      # These values are only for the local Docker exercise.
+      # Real deployments must inject secure secrets.
+      SESSION_SECRET: docker-development-session-secret-change-me
+      WEBHOOK_SECRET: docker-development-webhook-secret-change-me
+
+      # The mock payment controller calls the webhook from
+      # inside the same application container.
+      APP_BASE_URL: http://127.0.0.1:3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      database:
+        condition: service_healthy
+    command: >
+      sh -c "
+        npx prisma migrate deploy &&
+        npm run seed &&
+        npm start
+      "
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health').then(response => { if (!response.ok) process.exit(1) }).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+volumes:
+  doctorsa_postgres_data:

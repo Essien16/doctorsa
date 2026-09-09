@@ -26,9 +26,7 @@ export type CreatePaymentResult =
     };
 
 export type ProcessPaymentFailureReason =
-  | "PAYMENT_NOT_FOUND"
-  | "PAYMENT_DATA_MISMATCH"
-  | "VISIT_NOT_PAYABLE";
+  "PAYMENT_NOT_FOUND" | "PAYMENT_DATA_MISMATCH" | "VISIT_NOT_PAYABLE";
 
 export type ProcessPaymentResult =
   | {
@@ -50,8 +48,5 @@ export interface PaymentRepository {
     event: PaymentSucceededEvent,
   ): Promise<ProcessPaymentResult>;
 
-  findForPatient(
-    paymentId: string,
-    patientId: string,
-  ): Promise<Payment | null>;
+  findForPatient(paymentId: string, patientId: string): Promise<Payment | null>;
 }
