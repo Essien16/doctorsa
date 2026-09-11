@@ -1,26 +1,52 @@
 import { createApp } from "./app.js";
 import { env } from "./config/env.js";
-import { prisma } from "./infrastructure/database/prisma.js";
+import { closeMySqlConnection } from "./infrastructure/database/mysql.js";
 
 const app = createApp();
 
 const server = app.listen(env.PORT, () => {
-  console.log(`DoctorSA is running on http://localhost:${env.PORT}`);
+  console.info(`DoctorSA is running on http://localhost:${env.PORT}`);
 });
 
-async function shutdown(signal: string): Promise<void> {
-  console.log(`${signal} received. Shutting down...`);
+let shuttingDown = false;
 
-  server.close(async () => {
-    await prisma.$disconnect();
-    process.exit(0);
+function closeHttpServer(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    server.close((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
   });
 }
 
-process.on("SIGINT", () => {
+async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) {
+    return;
+  }
+
+  shuttingDown = true;
+
+  console.info(`${signal} received. Shutting down...`);
+
+  try {
+    await closeHttpServer();
+    await closeMySqlConnection();
+
+    console.info("DoctorSA shut down successfully.");
+  } catch (error: unknown) {
+    console.error("DoctorSA failed to shut down cleanly:", error);
+    process.exitCode = 1;
+  }
+}
+
+process.once("SIGINT", () => {
   void shutdown("SIGINT");
 });
 
-process.on("SIGTERM", () => {
+process.once("SIGTERM", () => {
   void shutdown("SIGTERM");
 });

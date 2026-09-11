@@ -1,14 +1,14 @@
-import { prisma } from "../../infrastructure/database/prisma.js";
+import { mysqlPool } from "../../infrastructure/database/mysql.js";
 import { GetCurrentUserService } from "./application/get-current-user.service.js";
 import { LoginService } from "./application/login.service.js";
 import { BcryptPasswordHasher } from "./infrastructure/bcrypt-password-hasher.js";
-import { PrismaUserRepository } from "./infrastructure/prisma-user.repository.js";
-import { AuthController } from "./presentation/auth.controller.js";
-import { createAuthRouter } from "./presentation/auth.routes.js";
+import { MySqlUserRepository } from "./infrastructure/mysql-user.repository.js";
 import { AuthPageController } from "./presentation/auth-page.controller.js";
 import { createAuthPageRouter } from "./presentation/auth-page.routes.js";
+import { AuthController } from "./presentation/auth.controller.js";
+import { createAuthRouter } from "./presentation/auth.routes.js";
 
-const userRepository = new PrismaUserRepository(prisma);
+const userRepository = new MySqlUserRepository(mysqlPool);
 const passwordHasher = new BcryptPasswordHasher();
 
 const loginService = new LoginService(userRepository, passwordHasher);

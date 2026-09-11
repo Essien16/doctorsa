@@ -1,21 +1,27 @@
 services:
   database:
-    image: postgres:15-alpine
+    image: mysql:8.4
     environment:
-      POSTGRES_DB: doctorsa
-      POSTGRES_USER: doctorsa_user
-      POSTGRES_PASSWORD: doctorsa_dev_password
+      MYSQL_DATABASE: doctorsa
+      MYSQL_USER: doctorsa_user
+      MYSQL_PASSWORD: doctorsa_dev_password
+      MYSQL_ROOT_PASSWORD: doctorsa_root_password
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
     volumes:
-      - doctorsa_postgres_data:/var/lib/postgresql/data
+      - doctorsa_mysql_data:/var/lib/mysql
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U doctorsa_user -d doctorsa",
+          "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysqladmin ping -h 127.0.0.1 -u root
+          --silent",
         ]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
+      start_period: 15s
     restart: unless-stopped
 
   app:
@@ -26,15 +32,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgresql://doctorsa_user:doctorsa_dev_password@database:5432/doctorsa
-
-      # These values are only for the local Docker exercise.
-      # Real deployments must inject secure secrets.
+      MYSQL_DATABASE_URL: mysql://doctorsa_user:doctorsa_dev_password@database:3306/doctorsa
       SESSION_SECRET: docker-development-session-secret-change-me
       WEBHOOK_SECRET: docker-development-webhook-secret-change-me
-
-      # The mock payment controller calls the webhook from
-      # inside the same application container.
       APP_BASE_URL: http://127.0.0.1:3000
     ports:
       - "3000:3000"
@@ -43,8 +43,8 @@ services:
         condition: service_healthy
     command: >
       sh -c "
-        npx prisma migrate deploy &&
-        npm run seed &&
+        npm run db:mysql:migrate &&
+        npm run db:mysql:seed &&
         npm start
       "
     healthcheck:
@@ -53,13 +53,14 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3000/health').then(response => { if (!response.ok) process.exit(1) }).catch(() => process.exit(1))",
+          "fetch('http://127.0.0.1:3000/health').then(response => { if
+          (!response.ok) process.exit(1) }).catch(() => process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 15s
+      start_period: 20s
     restart: unless-stopped
 
 volumes:
-  doctorsa_postgres_data:
+  doctorsa_mysql_data:

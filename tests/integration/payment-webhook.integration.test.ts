@@ -2,36 +2,42 @@ import "dotenv/config";
 
 import { randomUUID } from "node:crypto";
 
-import { PrismaPg } from "@prisma/adapter-pg";
+import { afterAll, beforeEach, describe, expect, it } from "@jest/globals";
+import type { RowDataPacket } from "mysql2/promise";
+
 import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-} from "@jest/globals";
+  closeMySqlConnection,
+  mysqlPool,
+} from "../../src/infrastructure/database/mysql.js";
+import { withTransaction } from "../../src/infrastructure/database/transaction.js";
+import { MySqlPaymentRepository } from "../../src/modules/payments/infrastructure/mysql-payment.repository.js";
 
-import { PrismaClient } from "../../src/generated/prisma/client.js";
-import { PrismaPaymentRepository } from "../../src/modules/payments/infrastructure/prisma-payment.repository.js";
-
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.MYSQL_DATABASE_URL;
 
 if (!databaseUrl?.includes("doctorsa_test")) {
-  throw new Error("Integration tests must use the doctorsa_test database");
+  throw new Error(
+    "Integration tests must use the doctorsa_test MySQL database",
+  );
 }
 
-const adapter = new PrismaPg({
-  connectionString: databaseUrl,
-});
+interface PaymentRow extends RowDataPacket {
+  status: string;
+  paidAt: Date | null;
+}
 
-const prisma = new PrismaClient({
-  adapter,
-});
+interface VisitRow extends RowDataPacket {
+  status: string;
+  assignedDoctorProfileId: string | null;
+  reservedDoctorProfileId: string | null;
+}
 
-const paymentRepository = new PrismaPaymentRepository(prisma);
+interface CountRow extends RowDataPacket {
+  count: number | string;
+}
 
-describe("PrismaPaymentRepository webhook processing", () => {
+const paymentRepository = new MySqlPaymentRepository(mysqlPool);
+
+describe("MySqlPaymentRepository webhook processing", () => {
   const ids = {
     specialtyId: randomUUID(),
     patientId: randomUUID(),
@@ -53,210 +59,241 @@ describe("PrismaPaymentRepository webhook processing", () => {
     },
   };
 
-  beforeAll(async () => {
-    await prisma.$connect();
-  });
+  async function cleanUp(): Promise<void> {
+    await mysqlPool.execute(
+      `
+        DELETE FROM webhook_events
+        WHERE provider_event_id = ?
+      `,
+      [event.id],
+    );
+
+    await mysqlPool.execute(
+      `
+        DELETE FROM payments
+        WHERE id = ?
+      `,
+      [ids.paymentId],
+    );
+
+    /*
+     * Remove references to the bid and doctor before
+     * deleting fixture records.
+     */
+    await mysqlPool.execute(
+      `
+        UPDATE visits
+        SET
+          selected_bid_id = NULL,
+          reserved_doctor_profile_id = NULL,
+          assigned_doctor_profile_id = NULL
+        WHERE id = ?
+      `,
+      [ids.visitId],
+    );
+
+    await mysqlPool.execute(
+      `
+        DELETE FROM bids
+        WHERE id = ?
+      `,
+      [ids.bidId],
+    );
+
+    await mysqlPool.execute(
+      `
+        DELETE FROM visits
+        WHERE id = ?
+      `,
+      [ids.visitId],
+    );
+
+    await mysqlPool.execute(
+      `
+        DELETE FROM doctor_profiles
+        WHERE id = ?
+      `,
+      [ids.doctorProfileId],
+    );
+
+    await mysqlPool.execute(
+      `
+        DELETE FROM users
+        WHERE id IN (?, ?)
+      `,
+      [ids.patientId, ids.doctorUserId],
+    );
+
+    await mysqlPool.execute(
+      `
+        DELETE FROM specialties
+        WHERE id = ?
+      `,
+      [ids.specialtyId],
+    );
+  }
 
   beforeEach(async () => {
-    await prisma.webhookEvent.deleteMany({
-      where: {
-        providerEventId: event.id,
-      },
-    });
-
-    await prisma.visitStatusHistory.deleteMany({
-      where: {
-        visitId: ids.visitId,
-      },
-    });
-
-    await prisma.payment.deleteMany({
-      where: {
-        id: ids.paymentId,
-      },
-    });
-
-    await prisma.visit.deleteMany({
-      where: {
-        id: ids.visitId,
-      },
-    });
-
-    await prisma.bid.deleteMany({
-      where: {
-        id: ids.bidId,
-      },
-    });
-
-    await prisma.doctorProfile.deleteMany({
-      where: {
-        id: ids.doctorProfileId,
-      },
-    });
-
-    await prisma.user.deleteMany({
-      where: {
-        id: {
-          in: [ids.patientId, ids.doctorUserId],
-        },
-      },
-    });
-
-    await prisma.specialty.deleteMany({
-      where: {
-        id: ids.specialtyId,
-      },
-    });
+    await cleanUp();
 
     const preferredAt = new Date("2030-09-15T11:00:00.000Z");
 
     const scheduledEndAt = new Date("2030-09-15T12:00:00.000Z");
 
-    await prisma.specialty.create({
-      data: {
-        id: ids.specialtyId,
-        name: `Integration Specialty ${ids.specialtyId}`,
-      },
-    });
+    await withTransaction(mysqlPool, async (connection) => {
+      await connection.execute(
+        `
+            INSERT INTO specialties (
+              id,
+              name
+            )
+            VALUES (?, ?)
+          `,
+        [ids.specialtyId, `Integration Specialty ${ids.specialtyId}`],
+      );
 
-    await prisma.user.createMany({
-      data: [
-        {
-          id: ids.patientId,
-          name: "Integration Patient",
-          email: `patient-${ids.patientId}@example.com`,
-          passwordHash: "unused-test-hash",
-          role: "PATIENT",
-        },
-        {
-          id: ids.doctorUserId,
-          name: "Integration Doctor",
-          email: `doctor-${ids.doctorUserId}@example.com`,
-          passwordHash: "unused-test-hash",
-          role: "DOCTOR",
-        },
-      ],
-    });
+      await connection.execute(
+        `
+            INSERT INTO users (
+              id,
+              name,
+              email,
+              password_hash,
+              role
+            )
+            VALUES (?, ?, ?, ?, 'PATIENT')
+          `,
+        [
+          ids.patientId,
+          "Integration Patient",
+          `patient-${ids.patientId}@example.com`,
+          "unused-test-hash",
+        ],
+      );
 
-    await prisma.doctorProfile.create({
-      data: {
-        id: ids.doctorProfileId,
-        userId: ids.doctorUserId,
-        specialtyId: ids.specialtyId,
-      },
-    });
+      await connection.execute(
+        `
+            INSERT INTO users (
+              id,
+              name,
+              email,
+              password_hash,
+              role
+            )
+            VALUES (?, ?, ?, ?, 'DOCTOR')
+          `,
+        [
+          ids.doctorUserId,
+          "Integration Doctor",
+          `doctor-${ids.doctorUserId}@example.com`,
+          "unused-test-hash",
+        ],
+      );
 
-    await prisma.visit.create({
-      data: {
-        id: ids.visitId,
-        patientId: ids.patientId,
-        specialtyId: ids.specialtyId,
-        location: "Integration Test Location",
-        preferredAt,
-        scheduledEndAt,
-        status: "BIDDING",
-      },
-    });
+      await connection.execute(
+        `
+            INSERT INTO doctor_profiles (
+              id,
+              user_id,
+              specialty_id
+            )
+            VALUES (?, ?, ?)
+          `,
+        [ids.doctorProfileId, ids.doctorUserId, ids.specialtyId],
+      );
 
-    await prisma.bid.create({
-      data: {
-        id: ids.bidId,
-        visitId: ids.visitId,
-        doctorProfileId: ids.doctorProfileId,
-        amountInKobo: 1_500_000,
-        note: "Integration test bid",
-      },
-    });
+      await connection.execute(
+        `
+            INSERT INTO visits (
+              id,
+              patient_id,
+              specialty_id,
+              location,
+              preferred_at,
+              scheduled_end_at,
+              status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, 'BIDDING')
+          `,
+        [
+          ids.visitId,
+          ids.patientId,
+          ids.specialtyId,
+          "Integration Test Location",
+          preferredAt,
+          scheduledEndAt,
+        ],
+      );
 
-    await prisma.visit.update({
-      where: {
-        id: ids.visitId,
-      },
-      data: {
-        selectedBidId: ids.bidId,
-        reservedDoctorProfileId: ids.doctorProfileId,
-      },
-    });
+      await connection.execute(
+        `
+            INSERT INTO bids (
+              id,
+              visit_id,
+              doctor_profile_id,
+              amount_in_kobo,
+              note
+            )
+            VALUES (?, ?, ?, ?, ?)
+          `,
+        [
+          ids.bidId,
+          ids.visitId,
+          ids.doctorProfileId,
+          1_500_000,
+          "Integration test bid",
+        ],
+      );
 
-    await prisma.payment.create({
-      data: {
-        id: ids.paymentId,
-        visitId: ids.visitId,
-        bidId: ids.bidId,
-        providerReference,
-        amountInKobo: 1_500_000,
-        status: "PENDING",
-      },
-    });
+      await connection.execute(
+        `
+            UPDATE visits
+            SET
+              selected_bid_id = ?,
+              reserved_doctor_profile_id = ?
+            WHERE id = ?
+          `,
+        [ids.bidId, ids.doctorProfileId, ids.visitId],
+      );
 
-    await prisma.visitStatusHistory.createMany({
-      data: [
-        {
-          visitId: ids.visitId,
-          fromStatus: null,
-          toStatus: "OPEN",
-        },
-        {
-          visitId: ids.visitId,
-          fromStatus: "OPEN",
-          toStatus: "BIDDING",
-        },
-      ],
+      await connection.execute(
+        `
+            INSERT INTO payments (
+              id,
+              visit_id,
+              bid_id,
+              provider_reference,
+              amount_in_kobo,
+              status
+            )
+            VALUES (?, ?, ?, ?, ?, 'PENDING')
+          `,
+        [ids.paymentId, ids.visitId, ids.bidId, providerReference, 1_500_000],
+      );
+
+      await connection.execute(
+        `
+            INSERT INTO visit_status_history (
+              id,
+              visit_id,
+              from_status,
+              to_status
+            )
+            VALUES
+              (?, ?, NULL, 'OPEN'),
+              (?, ?, 'OPEN', 'BIDDING')
+          `,
+        [randomUUID(), ids.visitId, randomUUID(), ids.visitId],
+      );
     });
   });
 
   afterAll(async () => {
-    await prisma.webhookEvent.deleteMany({
-      where: {
-        providerEventId: event.id,
-      },
-    });
-
-    await prisma.visitStatusHistory.deleteMany({
-      where: {
-        visitId: ids.visitId,
-      },
-    });
-
-    await prisma.payment.deleteMany({
-      where: {
-        id: ids.paymentId,
-      },
-    });
-
-    await prisma.visit.deleteMany({
-      where: {
-        id: ids.visitId,
-      },
-    });
-
-    await prisma.bid.deleteMany({
-      where: {
-        id: ids.bidId,
-      },
-    });
-
-    await prisma.doctorProfile.deleteMany({
-      where: {
-        id: ids.doctorProfileId,
-      },
-    });
-
-    await prisma.user.deleteMany({
-      where: {
-        id: {
-          in: [ids.patientId, ids.doctorUserId],
-        },
-      },
-    });
-
-    await prisma.specialty.deleteMany({
-      where: {
-        id: ids.specialtyId,
-      },
-    });
-
-    await prisma.$disconnect();
+    try {
+      await cleanUp();
+    } finally {
+      await closeMySqlConnection();
+    }
   });
 
   it("processes a successful payment exactly once", async () => {
@@ -277,49 +314,78 @@ describe("PrismaPaymentRepository webhook processing", () => {
       alreadyProcessed: false,
     });
 
-    const payment = await prisma.payment.findUniqueOrThrow({
-      where: {
-        id: ids.paymentId,
-      },
+    const [paymentRows] = await mysqlPool.execute<PaymentRow[]>(
+      `
+            SELECT
+              status,
+              paid_at AS paidAt
+            FROM payments
+            WHERE id = ?
+            LIMIT 1
+          `,
+      [ids.paymentId],
+    );
+
+    expect(paymentRows[0]?.status).toBe("SUCCEEDED");
+
+    expect(paymentRows[0]?.paidAt).toBeInstanceOf(Date);
+
+    const [visitRows] = await mysqlPool.execute<VisitRow[]>(
+      `
+            SELECT
+              status,
+              assigned_doctor_profile_id
+                AS assignedDoctorProfileId,
+              reserved_doctor_profile_id
+                AS reservedDoctorProfileId
+            FROM visits
+            WHERE id = ?
+            LIMIT 1
+          `,
+      [ids.visitId],
+    );
+
+    expect(visitRows[0]).toMatchObject({
+      status: "ASSIGNED",
+      assignedDoctorProfileId: ids.doctorProfileId,
+      reservedDoctorProfileId: null,
     });
 
-    expect(payment.status).toBe("SUCCEEDED");
-    expect(payment.paidAt).not.toBeNull();
+    const [webhookCountRows] = await mysqlPool.execute<CountRow[]>(
+      `
+            SELECT COUNT(*) AS count
+            FROM webhook_events
+            WHERE provider_event_id = ?
+          `,
+      [event.id],
+    );
 
-    const visit = await prisma.visit.findUniqueOrThrow({
-      where: {
-        id: ids.visitId,
-      },
-    });
+    expect(Number(webhookCountRows[0]?.count)).toBe(1);
 
-    expect(visit.status).toBe("ASSIGNED");
-    expect(visit.assignedDoctorProfileId).toBe(ids.doctorProfileId);
+    const [paidTransitionRows] = await mysqlPool.execute<CountRow[]>(
+      `
+            SELECT COUNT(*) AS count
+            FROM visit_status_history
+            WHERE visit_id = ?
+              AND from_status = 'BIDDING'
+              AND to_status = 'PAID'
+          `,
+      [ids.visitId],
+    );
 
-    const webhookEventCount = await prisma.webhookEvent.count({
-      where: {
-        providerEventId: event.id,
-      },
-    });
+    const [assignedTransitionRows] = await mysqlPool.execute<CountRow[]>(
+      `
+            SELECT COUNT(*) AS count
+            FROM visit_status_history
+            WHERE visit_id = ?
+              AND from_status = 'PAID'
+              AND to_status = 'ASSIGNED'
+          `,
+      [ids.visitId],
+    );
 
-    expect(webhookEventCount).toBe(1);
+    expect(Number(paidTransitionRows[0]?.count)).toBe(1);
 
-    const paidTransitionCount = await prisma.visitStatusHistory.count({
-      where: {
-        visitId: ids.visitId,
-        fromStatus: "BIDDING",
-        toStatus: "PAID",
-      },
-    });
-
-    const assignedTransitionCount = await prisma.visitStatusHistory.count({
-      where: {
-        visitId: ids.visitId,
-        fromStatus: "PAID",
-        toStatus: "ASSIGNED",
-      },
-    });
-
-    expect(paidTransitionCount).toBe(1);
-    expect(assignedTransitionCount).toBe(1);
+    expect(Number(assignedTransitionRows[0]?.count)).toBe(1);
   });
 });

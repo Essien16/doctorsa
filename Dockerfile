@@ -6,12 +6,10 @@ COPY package.json package-lock.json ./
 
 RUN npm ci --include=dev --no-audit --no-fund
 
-COPY prisma ./prisma
-COPY prisma7.config.ts ./
 COPY tsconfig.json ./
+COPY database ./database
+COPY scripts ./scripts
 COPY src ./src
-
-RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate
 
 RUN npm run build
 

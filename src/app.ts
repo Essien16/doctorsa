@@ -1,26 +1,27 @@
 import express, { type Express } from "express";
 
 import { sessionMiddleware } from "./config/session.js";
-import { prisma } from "./infrastructure/database/prisma.js";
-import { authRouter, authPageRouter } from "./modules/auth/auth.module.js";
-import { errorHandler } from "./shared/http/error-handler.js";
-import { notFoundHandler } from "./shared/http/not-found-handler.js";
+import { configureViews } from "./config/views.js";
+import { checkMySqlConnection } from "./infrastructure/database/mysql.js";
+import { authPageRouter, authRouter } from "./modules/auth/auth.module.js";
 import {
-  specialtyRouter,
-  visitRouter,
-  patientPageRouter,
-  doctorPageRouter,
-} from "./modules/visits/visit.module.js";
-import {
+  mockPaymentRouter,
+  paymentPageRouter,
   paymentSelectionRouter,
   paymentWebhookRouter,
-  mockPaymentRouter,
-  paymentPageRouter
 } from "./modules/payments/payment.module.js";
-import { configureViews } from "./config/views.js";
+import {
+  doctorPageRouter,
+  patientPageRouter,
+  specialtyRouter,
+  visitRouter,
+} from "./modules/visits/visit.module.js";
+import { errorHandler } from "./shared/http/error-handler.js";
+import { notFoundHandler } from "./shared/http/not-found-handler.js";
 
 export function createApp(): Express {
   const app = express();
+
   configureViews(app);
 
   app.disable("x-powered-by");
@@ -37,10 +38,12 @@ export function createApp(): Express {
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));
   app.use(sessionMiddleware);
+
   app.use(authPageRouter);
   app.use(patientPageRouter);
   app.use(paymentPageRouter);
   app.use(doctorPageRouter);
+
   app.use("/auth", authRouter);
   app.use("/specialties", specialtyRouter);
   app.use("/visits", visitRouter);
@@ -49,7 +52,7 @@ export function createApp(): Express {
 
   app.get("/health", async (_request, response) => {
     try {
-      await prisma.$queryRaw`SELECT 1`;
+      await checkMySqlConnection();
 
       response.status(200).json({
         status: "ok",

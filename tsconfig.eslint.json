@@ -5,17 +5,12 @@
     "rootDir": ".",
     "types": ["node", "jest"]
   },
-  "include": [
-    "src/**/*.ts",
-    "prisma/**/*.ts",
-    "tests/**/*.ts"
-  ],
+  "include": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"],
   "exclude": [
     "node_modules",
     "node_modules.backup",
     "dist",
     "coverage",
-    "src/generated",
-    "prisma/migrations"
+    "src/generated"
   ]
 }
