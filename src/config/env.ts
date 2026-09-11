@@ -14,6 +14,11 @@ const environmentSchema = z.object({
     .string()
     .min(32, "SESSION_SECRET must contain at least 32 characters"),
 
+  SESSION_COOKIE_SECURE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+
   WEBHOOK_SECRET: z
     .string()
     .min(32, "WEBHOOK_SECRET must contain at least 32 characters"),
