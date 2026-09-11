@@ -19,11 +19,11 @@ docker compose up --build
 This one command:
 
 1. Builds the TypeScript application.
-2. Starts PostgreSQL.
-3. Waits for PostgreSQL to become healthy.
-4. Applies Prisma migrations.
+2. Starts MySQL 8.4.
+3. Waits for MySQL to become healthy.
+4. Applies the raw SQL migrations.
 5. Seeds the demo accounts.
-6. Starts DoctorSA.
+6. Starts DoctorSA on port 3000.
 
 Open:
 
@@ -80,20 +80,32 @@ lifecycle.
 DoctorSA is implemented as a modular monolith with feature-first modules.
 
 ```text
-src/
-├── config/
-├── infrastructure/
-│   └── database/
-├── middleware/
-├── modules/
-│   ├── auth/
-│   ├── payments/
-│   └── visits/
-├── shared/
-├── views/
-├── public/
-├── app.ts
-└── server.ts
+doctorsa/
+├── database/
+│   └── migrations/
+├── scripts/
+│   ├── migrate-mysql.ts
+│   └── seed-mysql.ts
+├── src/
+│   ├── config/
+│   ├── infrastructure/
+│   │   ├── database/
+│   │   └── session/
+│   ├── middleware/
+│   ├── modules/
+│   │   ├── auth/
+│   │   ├── payments/
+│   │   └── visits/
+│   ├── public/
+│   ├── shared/
+│   ├── views/
+│   ├── app.ts
+│   └── server.ts
+├── tests/
+│   ├── integration/
+│   └── unit/
+├── Dockerfile
+└── docker-compose.yml
 ```
 
 Each business module is separated into:
@@ -108,7 +120,7 @@ presentation/
 ### Domain
 
 Contains business-facing types and repository contracts. It does not depend on
-Express or Prisma
+Express or MySQL
 
 ### Application
 
@@ -117,8 +129,9 @@ processing payment webhooks.
 
 ### Infrastructure
 
-Contains Prisma repository implementations, PostgreSQL transactions, HMAC
-signing, and mock payment infrastructure
+Implements repository contracts with raw parameterised MySQL queries. It also
+contains connection pooling, transactions, session persistence, HMAC signing,
+and the mock payment infrastructure
 
 ### Presentation
 
@@ -133,24 +146,36 @@ A modular monolith keeps deployment simple while maintaining clear feature
 boundaries. Microservices would add unnecessary complexity to the project hence
 my decisiion to go with modular monolith.
 
-### PostgreSQL and Prisma
+### Raw MySQL with repository interfaces
 
-This implementation uses PostgreSQL with Prisma. I initially started the project
-with PostgreSQL before properly noting that MySQL is part of the company’s
-stack.
+The application uses MySQL directly through mysql2/promise. SQL is kept in the
+infrastructure layer, while application services depend on repository
+interfaces. This keeps business rules separate from persistence and allows the
+services to be unit-tested without a database.
 
-I decided to retain the PostgreSQL implementation for this submission because
-the core flow was already stable, and PostgreSQL also gave me useful concurrency
-features for preventing overlapping appointments and safely processing payments.
+Raw SQL was chosen to make the locking, transaction boundaries, constraints,
+and idempotency behaviour explicit. The trade-off is more manual row mapping
+and less compile-time query safety.
 
-I understand that MySQL would be the preferred choice within the team. The
-application is structured so that most database-specific code is contained in
-the infrastructure layer. Moving it to MySQL would mainly involve updating the
-Prisma datasource, migrations, session store, and PostgreSQL-specific locking
-and scheduling logic.
+All queries containing user-controlled values use placeholders rather than
+string interpolation.
 
-Prisma provides typed database access, reproducible migrations, and a clean
-separation between the business logic and database implementation.
+### SQL migrations
+
+Migration files live in database/migrations and are applied by
+scripts/migrate-mysql.ts.
+
+The migration runner:
+
+1. Applies .sql files in filename order.
+2. Records applied migrations in schema_migrations.
+3. Stores a SHA-256 checksum for each migration.
+4. Rejects an applied migration if its contents have changed.
+5. Uses MySQL GET_LOCK to prevent two application instances from migrating the
+database at the same time.
+
+MySQL DDL statements can commit implicitly, so migrations should be small,
+forward-only, and safe to diagnose if a statement fails.
 
 ### Database-backed sessions
 
@@ -164,11 +189,6 @@ Sessions fit the server-rendered application because:
 - No JWT refresh-token workflow is required.
 - Authentication state is immediately invalidated on logout.
 
-### Repository interfaces
-
-Application services depend on repository interfaces rather than Prisma
-directly. This keeps business logic separate from persistence details and makes
-service-level testing straightforward.
 
 ### Mock payment provider
 
@@ -185,15 +205,13 @@ The mock confirmation:
 
 ### Idempotent webhook processing
 
-Every provider event has a unique `providerEventId`.
+Every provider event has a unique provider event ID. Webhook processing runs in
+a MySQL transaction and uses row locks around the relevant visit and payment.
 
-Webhook processing:
-
-- Executes inside a PostgreSQL transaction.
-- Locks the visit and payment rows.
-- Stores the provider event with a unique constraint.
-- Uses `ON CONFLICT DO NOTHING` for concurrent duplicate delivery.
-- Updates payment and visit state only once.
+The event is stored in webhook_events, where provider_event_id is unique.
+INSERT IGNORE safely handles concurrent delivery of the same event. A duplicate
+event returns success without repeating the payment update, assignment, or
+status-history transitions.
 
 Duplicate events return success without repeating state transitions.
 
@@ -219,17 +237,19 @@ but rejects overlapping appointments:
 12:30–13:30
 ```
 
-PostgreSQL GiST exclusion constraints prevent:
+Patient scheduling is protected by locking the patient's stable users row
+before checking and creating a visit. Doctor scheduling is protected by locking
+the doctor's stable doctor_profiles row before checking and creating a
+reservation. This serialises concurrent attempts for the same patient or doctor
+without introducing an application queue.
 
-- A patient from requesting overlapping visits.
-- A doctor from being reserved for overlapping visits.
+The overlap queries run in READ COMMITTED transactions so a request that
+waited for a lock sees the reservation committed by the preceding transaction.
+Integration tests exercise these concurrent cases against a real MySQL database.
 
-Application-level checks provide meaningful conflict errors, while database
-constraints protect against concurrent requests.
-
-Doctors may bid on overlapping requests because bids are offers rather than
-confirmed appointments. The doctor’s schedule is reserved when the patient
-selects a bid.
+Doctors may bid on overlapping requests because a bid is only an offer. The
+doctor's schedule is reserved when the patient selects a bid and a pending
+payment is created.
 
 ## API overview
 
@@ -262,31 +282,62 @@ POST /webhooks/payments
 
 ## Testing
 
-Run:
+### Unit tests
 
-```bash
 npm test
-```
 
-The Jest tests currently cover payment webhook application behaviour, including
-duplicate events and invalid payment states.
+or:
 
-Additional manual verification was performed for:
+npm run test:unit
 
-- Session creation and logout.
-- Role-based access control.
-- Visit creation.
-- Doctor bidding.
-- Bid selection.
-- Mock payment confirmation.
-- Complete visit status history.
-- Duplicate webhook delivery.
-- Assigned-doctor retrieval.
-- Scheduling conflicts.
+Unit tests cover application-level rules such as authentication failures,
+request validation, bid submission, payment creation, webhook result handling,
+and HMAC signature verification.
+
+### Integration tests
+
+Integration tests require a separate MySQL database whose name contains
+doctorsa_test. This guard reduces the risk of accidentally cleaning a
+development or production database.
+
+Configure .env.test, apply migrations, and run:
+
+npm run test:integration
+
+The integration suite covers:
+
+The complete patient request to doctor assignment flow.
+
+Successful and duplicate payment webhooks.
+
+Payment and status-history idempotency.
+
+Patient scheduling conflicts.
+
+Doctor reservation conflicts.
+
+Concurrent attempts to reserve the same doctor.
+
+Overlapping visits for different doctors.
+
+Consecutive non-overlapping appointments.
+
+Run every test:
+
+npm run test:all
+
+Run all local quality checks:
+
+npm run check
+npm run test:integration
+npm run build
 
 ## Local development without Docker
 
-Create a PostgreSQL database and configure `.env`:
+### Requirements
+
+1. Node.js 24
+2. MySQL 8.4 or a compatible MySQL 8 release
 
 ```env
 DATABASE_URL="postgresql://doctorsa_user:doctorsa_dev_password@localhost:5432/doctorsa"
@@ -298,12 +349,12 @@ WEBHOOK_SECRET="124a0cb39bf99acf74cab9f3cb9d311a7b818c24dc28af258aa5234318bf4ca3
 APP_BASE_URL="http://127.0.0.1:3000"
 ```
 
-Install dependencies and prepare the database:
+Install dependencies and then create the database and run:
 
 ```bash
 npm install
-npx prisma migrate dev
-npm run seed
+npm run db:mysql:migrate
+npm run db:mysql:seed
 ```
 
 Start development mode:
@@ -313,15 +364,6 @@ npm run dev
 ```
 
 ## Trade-offs
-
-### Database choice
-
-The exercise mentions MySQL as part of the company’s stack, but this
-implementation currently uses PostgreSQL. I recognise this as a trade-off in my
-submission.
-
-If I were taking the project further within the team’s environment, aligning the
-persistence layer with MySQL would be one of my first changes.
 
 ### One payment attempt per visit
 
@@ -369,9 +411,11 @@ were omitted.
 
 I would prioritise:
 
-1. Migrating the persistence layer to MySQL.
-2. Adding PostgreSQL integration tests for webhook idempotency and scheduling.
+1. Add per-specialty visit durations and doctor availability windows.
+2. Add CI to run linting, type-checking, unit tests, integration tests, and the
+Docker build.
 3. Supporting reservation expiry and multiple payment attempts.
 4. Adding CSRF protection and login rate limiting.
 5. Adding cancellation and rescheduling.
-6. Implement logging with Pino/Winston
+6. Implement logging with Pino/Winston.
+7. Add retry handling for transient MySQL deadlocks and network errors.
