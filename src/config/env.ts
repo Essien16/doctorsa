@@ -1,5 +1,20 @@
 import "dotenv/config";
+
 import { z } from "zod";
+
+function isValidMySqlUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+
+    return (
+      url.protocol === "mysql:" &&
+      url.hostname.length > 0 &&
+      url.pathname.length > 1
+    );
+  } catch {
+    return false;
+  }
+}
 
 const environmentSchema = z.object({
   NODE_ENV: z
@@ -8,7 +23,13 @@ const environmentSchema = z.object({
 
   PORT: z.coerce.number().int().positive().default(3000),
 
-  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+  MYSQL_DATABASE_URL: z
+    .string()
+    .min(1, "MYSQL_DATABASE_URL is required")
+    .refine(isValidMySqlUrl, {
+      message:
+        "MYSQL_DATABASE_URL must be a valid MySQL URL containing a host and database name",
+    }),
 
   SESSION_SECRET: z
     .string()

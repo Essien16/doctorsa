@@ -1,23 +1,23 @@
-import { prisma } from "../../infrastructure/database/prisma.js";
+import { mysqlPool } from "../../infrastructure/database/mysql.js";
 import { CreateVisitService } from "./application/create-visit.service.js";
+import { GetPatientVisitService } from "./application/get-patient-visit.service.js";
+import { ListAssignedVisitsService } from "./application/list-assigned-visits.service.js";
+import { ListOpenVisitsService } from "./application/list-open-visits.service.js";
+import { ListPatientVisitsService } from "./application/list-patient-visits.service.js";
 import { ListSpecialtiesService } from "./application/list-specialties.service.js";
-import { PrismaVisitRepository } from "./infrastructure/prisma-visit.repository.js";
+import { SubmitBidService } from "./application/submit-bid.service.js";
+import { MySqlVisitRepository } from "./infrastructure/mysql-visit.repository.js";
+import { DoctorPageController } from "./presentation/doctor-page.controller.js";
+import { createDoctorPageRouter } from "./presentation/doctor-page.routes.js";
+import { PatientPageController } from "./presentation/patient-page.controller.js";
+import { createPatientPageRouter } from "./presentation/patient-page.routes.js";
 import { VisitController } from "./presentation/visit.controller.js";
 import {
   createSpecialtyRouter,
   createVisitRouter,
 } from "./presentation/visit.routes.js";
-import { ListOpenVisitsService } from "./application/list-open-visits.service.js";
-import { SubmitBidService } from "./application/submit-bid.service.js";
-import { GetPatientVisitService } from "./application/get-patient-visit.service.js";
-import { ListAssignedVisitsService } from "./application/list-assigned-visits.service.js";
-import { ListPatientVisitsService } from "./application/list-patient-visits.service.js";
-import { PatientPageController } from "./presentation/patient-page.controller.js";
-import { createPatientPageRouter } from "./presentation/patient-page.routes.js";
-import { DoctorPageController } from "./presentation/doctor-page.controller.js";
-import { createDoctorPageRouter } from "./presentation/doctor-page.routes.js";
 
-const visitRepository = new PrismaVisitRepository(prisma);
+const visitRepository = new MySqlVisitRepository(mysqlPool);
 
 const createVisitService = new CreateVisitService(visitRepository);
 
@@ -33,6 +33,8 @@ const listAssignedVisitsService = new ListAssignedVisitsService(
   visitRepository,
 );
 
+const listPatientVisitsService = new ListPatientVisitsService(visitRepository);
+
 const visitController = new VisitController(
   createVisitService,
   listSpecialtiesService,
@@ -41,8 +43,6 @@ const visitController = new VisitController(
   getPatientVisitService,
   listAssignedVisitsService,
 );
-
-const listPatientVisitsService = new ListPatientVisitsService(visitRepository);
 
 const patientPageController = new PatientPageController(
   listPatientVisitsService,

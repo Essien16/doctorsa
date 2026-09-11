@@ -3,11 +3,7 @@ import prettierConfig from "eslint-config-prettier";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-const typescriptFiles = [
-  "src/**/*.ts",
-  "prisma/**/*.ts",
-  "tests/**/*.ts",
-];
+const typescriptFiles = ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"];
 
 export default tseslint.config(
   {
@@ -17,7 +13,6 @@ export default tseslint.config(
       "dist/**",
       "coverage/**",
       "src/generated/**",
-      "prisma/migrations/**",
       "package-lock.backup.json",
     ],
   },
@@ -30,19 +25,15 @@ export default tseslint.config(
   /*
    * Restrict type-aware rules to TypeScript files.
    */
-  ...tseslint.configs.recommendedTypeChecked.map(
-    (configuration) => ({
-      ...configuration,
-      files: typescriptFiles,
-    }),
-  ),
+  ...tseslint.configs.recommendedTypeChecked.map((configuration) => ({
+    ...configuration,
+    files: typescriptFiles,
+  })),
 
-  ...tseslint.configs.stylisticTypeChecked.map(
-    (configuration) => ({
-      ...configuration,
-      files: typescriptFiles,
-    }),
-  ),
+  ...tseslint.configs.stylisticTypeChecked.map((configuration) => ({
+    ...configuration,
+    files: typescriptFiles,
+  })),
 
   /*
    * Project TypeScript configuration.
@@ -87,10 +78,7 @@ export default tseslint.config(
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/require-await": "error",
 
-      "@typescript-eslint/return-await": [
-        "error",
-        "in-try-catch",
-      ],
+      "@typescript-eslint/return-await": ["error", "in-try-catch"],
 
       "no-console": [
         "warn",
@@ -101,7 +89,7 @@ export default tseslint.config(
 
       "no-duplicate-imports": "error",
       "prefer-const": "error",
-      "eqeqeq": ["error", "always"],
+      eqeqeq: ["error", "always"],
     },
   },
 
